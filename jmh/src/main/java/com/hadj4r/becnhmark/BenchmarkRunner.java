@@ -17,13 +17,12 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.openjdk.jmh.annotations.Mode.Throughput;
 import static org.openjdk.jmh.annotations.Scope.Thread;
 
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 20, time = 1)
-@Fork(1)
+@Fork(3)
 @BenchmarkMode(Throughput)
 @OutputTimeUnit(MICROSECONDS)
 @State(Thread)
@@ -41,7 +40,22 @@ public class BenchmarkRunner {
 
     @Setup
     public void setup() {
-        immutableTestClass = new ImmutableTestClass(true, (short) 2, 3, 4L, 5.0f, 6.0d, "test", "another test");
+        immutableTestClass = ImmutableTestClass.builder()
+                .setBooleanVar(true)
+                .setShortVar((short) 2)
+                .setIntVar(3)
+                .setLongVar(4L)
+                .setFloatVar(5.0f)
+                .setDoubleVar(6.0)
+                .setStringVar("test")
+                .setStringVar2("another test")
+                .setBooleanArrayVar(new boolean[]{false, true, false})
+                .setShortArrayVar(new short[]{4, 5, 6})
+                .setIntArrayVar(new int[]{7, 8, 9})
+                .setLongArrayVar(new long[]{10L, 11L, 12L})
+                .setFloatArrayVar(new float[]{13.0f, 14.0f, 15.0f})
+                .setDoubleArrayVar(new double[]{16.0, 17.0, 18.0})
+                .build();
     }
 
     @Benchmark

@@ -5,7 +5,7 @@ ProtoDryb is new **BLAZINGLY FAST** serialization library for POJO classes.
 
 ProtoDryb library is designed for performance with ZERO runtime overhead.
 
-![Popular serializers benchmark results](./images/serialization_performance.jpg)
+![Popular serializers benchmark results](./images/serialization_performance.png)
 
 ## Features
 * works on existing POJO classes with just annotation processing
