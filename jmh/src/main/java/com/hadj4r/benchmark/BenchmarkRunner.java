@@ -35,7 +35,7 @@ public class BenchmarkRunner {
     private static final DslJson<Object> DSL_JSON = new DslJson<>(Settings.withRuntime().allowArrayFormat(true).includeServiceLoader());
     private static final JsonWriter WRITER = DSL_JSON.newWriter();
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final FlatBufferBuilder FLAT_BUFFER_BUILDER = new FlatBufferBuilder(0);
+    private final FlatBufferBuilder flatBufferBuilder = new FlatBufferBuilder(0);
     private ImmutableModel immutableModel;
     private ProtoModel immutableModelProto;
 
@@ -45,25 +45,23 @@ public class BenchmarkRunner {
 
     @Setup
     public void setup() {
-        initPojo();
-
-        initProtoPojo();
-
-        initFlatBuffersPojo();
     }
 
     @Benchmark
     public byte[] _000_ProtoDryb_Serialize() {
+        initPojo();
         return IMMUTABLE_MODEL_SERIALIZER.serialize(immutableModel);
     }
 
     @Benchmark
     public byte[] _100_Jackson_Serialize() throws JsonProcessingException {
+        initPojo();
         return OBJECT_MAPPER.writeValueAsBytes(immutableModel);
     }
 
     @Benchmark
     public byte[] _200_DslJson_Serialize() throws IOException {
+        initPojo();
         WRITER.reset();
         DSL_JSON.serialize(WRITER, immutableModel);
         return WRITER.toByteArray();
@@ -71,12 +69,14 @@ public class BenchmarkRunner {
 
     @Benchmark
     public byte[] _300_ProtoBuf_Serialize() {
+        initProtoPojo();
         return immutableModelProto.toByteArray();
     }
 
     @Benchmark
     public byte[] _400_FlatBuffers_Serialize() {
-        return FLAT_BUFFER_BUILDER.sizedByteArray();
+        initFlatBuffersPojo();
+        return flatBufferBuilder.sizedByteArray();
     }
 
 
@@ -207,32 +207,32 @@ public class BenchmarkRunner {
                 .build();
     }
 
-    private static void initFlatBuffersPojo() {
-        FLAT_BUFFER_BUILDER.clear();
-        final int stringVar = FLAT_BUFFER_BUILDER.createString("test");
-        final int stringVar2 = FLAT_BUFFER_BUILDER.createString("another test");
-        final int booleanArrVar = FlatbuffersModel.createBooleanArrayVarVector(FLAT_BUFFER_BUILDER, new boolean[]{false, true, false});
-        final int shortArrVar = FlatbuffersModel.createShortArrayVarVector(FLAT_BUFFER_BUILDER, new short[]{4, 5, 6});
-        final int intArrVar = FlatbuffersModel.createIntArrayVarVector(FLAT_BUFFER_BUILDER, new int[]{7, 8, 9});
-        final int longArrVar = FlatbuffersModel.createLongArrayVarVector(FLAT_BUFFER_BUILDER, new long[]{10L, 11L, 12L});
-        final int floatArrVar = FlatbuffersModel.createFloatArrayVarVector(FLAT_BUFFER_BUILDER, new float[]{13.0f, 14.0f, 15.0f});
-        final int doubleArrVar = FlatbuffersModel.createDoubleArrayVarVector(FLAT_BUFFER_BUILDER, new double[]{16.0, 17.0, 18.0});
-        FlatbuffersModel.startFlatbuffersModel(FLAT_BUFFER_BUILDER);
-        FlatbuffersModel.addBooleanVar(FLAT_BUFFER_BUILDER, true);
-        FlatbuffersModel.addShortVar(FLAT_BUFFER_BUILDER, (short) 2);
-        FlatbuffersModel.addIntVar(FLAT_BUFFER_BUILDER, 3);
-        FlatbuffersModel.addLongVar(FLAT_BUFFER_BUILDER, 4L);
-        FlatbuffersModel.addFloatVar(FLAT_BUFFER_BUILDER, 5.0f);
-        FlatbuffersModel.addDoubleVar(FLAT_BUFFER_BUILDER, 6.0);
-        FlatbuffersModel.addStringVar(FLAT_BUFFER_BUILDER, stringVar);
-        FlatbuffersModel.addStringVar2(FLAT_BUFFER_BUILDER, stringVar2);
-        FlatbuffersModel.addBooleanArrayVar(FLAT_BUFFER_BUILDER, booleanArrVar);
-        FlatbuffersModel.addShortArrayVar(FLAT_BUFFER_BUILDER, shortArrVar);
-        FlatbuffersModel.addIntArrayVar(FLAT_BUFFER_BUILDER, intArrVar);
-        FlatbuffersModel.addLongArrayVar(FLAT_BUFFER_BUILDER, longArrVar);
-        FlatbuffersModel.addFloatArrayVar(FLAT_BUFFER_BUILDER, floatArrVar);
-        FlatbuffersModel.addDoubleArrayVar(FLAT_BUFFER_BUILDER, doubleArrVar);
-        final int model = FlatbuffersModel.endFlatbuffersModel(FLAT_BUFFER_BUILDER);
-        FLAT_BUFFER_BUILDER.finish(model);
+    private void initFlatBuffersPojo() {
+        flatBufferBuilder.clear();
+        final int stringVar = flatBufferBuilder.createString("test");
+        final int stringVar2 = flatBufferBuilder.createString("another test");
+        final int booleanArrVar = FlatbuffersModel.createBooleanArrayVarVector(flatBufferBuilder, new boolean[]{false, true, false});
+        final int shortArrVar = FlatbuffersModel.createShortArrayVarVector(flatBufferBuilder, new short[]{4, 5, 6});
+        final int intArrVar = FlatbuffersModel.createIntArrayVarVector(flatBufferBuilder, new int[]{7, 8, 9});
+        final int longArrVar = FlatbuffersModel.createLongArrayVarVector(flatBufferBuilder, new long[]{10L, 11L, 12L});
+        final int floatArrVar = FlatbuffersModel.createFloatArrayVarVector(flatBufferBuilder, new float[]{13.0f, 14.0f, 15.0f});
+        final int doubleArrVar = FlatbuffersModel.createDoubleArrayVarVector(flatBufferBuilder, new double[]{16.0, 17.0, 18.0});
+        FlatbuffersModel.startFlatbuffersModel(flatBufferBuilder);
+        FlatbuffersModel.addBooleanVar(flatBufferBuilder, true);
+        FlatbuffersModel.addShortVar(flatBufferBuilder, (short) 2);
+        FlatbuffersModel.addIntVar(flatBufferBuilder, 3);
+        FlatbuffersModel.addLongVar(flatBufferBuilder, 4L);
+        FlatbuffersModel.addFloatVar(flatBufferBuilder, 5.0f);
+        FlatbuffersModel.addDoubleVar(flatBufferBuilder, 6.0);
+        FlatbuffersModel.addStringVar(flatBufferBuilder, stringVar);
+        FlatbuffersModel.addStringVar2(flatBufferBuilder, stringVar2);
+        FlatbuffersModel.addBooleanArrayVar(flatBufferBuilder, booleanArrVar);
+        FlatbuffersModel.addShortArrayVar(flatBufferBuilder, shortArrVar);
+        FlatbuffersModel.addIntArrayVar(flatBufferBuilder, intArrVar);
+        FlatbuffersModel.addLongArrayVar(flatBufferBuilder, longArrVar);
+        FlatbuffersModel.addFloatArrayVar(flatBufferBuilder, floatArrVar);
+        FlatbuffersModel.addDoubleArrayVar(flatBufferBuilder, doubleArrVar);
+        final int model = FlatbuffersModel.endFlatbuffersModel(flatBufferBuilder);
+        flatBufferBuilder.finish(model);
     }
 }
