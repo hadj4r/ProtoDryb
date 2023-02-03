@@ -6,25 +6,25 @@ import helpful.beanaccessor.javacompiler.JavaCompilerBeanAccessorReaderFactory;
 import helpful.beanaccessor.lambdametafactory.LambdaMetafactoryBeanAccessor;
 import helpful.beanaccessor.reflectasm.ReflectAsmIndexLookupBeanAccessor;
 import helpful.beanaccessor.reflectasm.ReflectAsmNameLookupBeanAccessor;
-import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
-import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
-import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static org.openjdk.jmh.annotations.Mode.AverageTime;
+import static org.openjdk.jmh.annotations.Scope.Thread;
 
 // for reference read https://www.optaplanner.org/blog/2018/01/09/JavaReflectionButMuchFaster.html
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 20, time = 1)
 @Fork(3)
-@BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.NANOSECONDS)
-@State(Scope.Thread)
+@BenchmarkMode(AverageTime)
+@OutputTimeUnit(NANOSECONDS)
+@State(Thread)
 public class ReflectionBeanAccessorPerformanceTest {
     // TODO: read about https://github.com/jOOQ/jOOR
     private final BeanAccessor javaCompilerBeanAccessorReader = JavaCompilerBeanAccessorReaderFactory.generate(Point.class, "x");

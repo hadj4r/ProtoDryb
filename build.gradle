@@ -21,6 +21,11 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-json'
+
+    implementation 'com.dslplatform:dsl-json-java8:1.10.0'
+    annotationProcessor 'com.dslplatform:dsl-json-java8:1.10.0'
+
     implementation 'org.reflections:reflections:0.9.12'
     implementation 'com.esotericsoftware:reflectasm:1.11.9'
 

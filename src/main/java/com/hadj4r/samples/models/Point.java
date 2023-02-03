@@ -1,5 +1,6 @@
 package com.hadj4r.samples.models;
 
+import com.dslplatform.json.CompiledJson;
 import com.hadj4r.protodryb.Convertable;
 import com.hadj4r.protodryb.PrimitiveField;
 import lombok.AllArgsConstructor;
@@ -10,6 +11,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Convertable
+@CompiledJson
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

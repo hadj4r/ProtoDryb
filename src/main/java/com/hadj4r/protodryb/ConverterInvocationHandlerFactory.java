@@ -37,6 +37,7 @@ public class ConverterInvocationHandlerFactory {
     private Set<Field> getSerializedFieldsSortedByOrder(final Class<?> modelClass) {
         final List<Field> annotatedFields = Arrays.stream(modelClass.getDeclaredFields())
                 .filter(f -> f.isAnnotationPresent(PrimitiveField.class))       // TODO: temporary, add more generic annotation
+                .filter(f -> f.getType().isPrimitive())
                 .collect(Collectors.toList());
 
         validateFields(annotatedFields);
