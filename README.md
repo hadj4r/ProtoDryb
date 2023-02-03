@@ -33,7 +33,7 @@ public interface MyPojoSerializer extends SerializerService<MyPojo> {
 
 ## TODOs
 list of things to do with mark of undone
-- [ ] add support for arrays
+- [x] add support for arrays
 - [ ] add support for collections
 - [ ] add support for nested objects
 - [ ] add bit packing for primitive types (compact varints)
