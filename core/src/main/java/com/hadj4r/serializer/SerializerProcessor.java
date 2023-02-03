@@ -54,14 +54,25 @@ public class SerializerProcessor extends AbstractProcessor {
             "double", 8
     );
 
+    private static final Map<Integer, String> SHIFT_TO_HEX_COVER = Map.of(
+            0, "0xFF",
+            1, "0x7F",
+            2, "0x3F",
+            3, "0x1F",
+            4, "0x0F",
+            5, "0x07",
+            6, "0x03",
+            7, "0x01"
+    );
+
     private static final BiFunction<Integer, String, String> BOOLEAN_CONVERTER = """
             \t\tresult[%s] = (byte) (model.%s ? 1 : 0);
             \t\toffset += 1;
             """::formatted;
 
     private static final BiFunction<Integer, String, String> CHAR_CONVERTER = (offset, getterName) -> """
-            \t\tresult[%s] = (byte) model.%s;
             \t\tresult[%s] = (byte) (model.%s >> 8);
+            \t\tresult[%s] = (byte) model.%s;
             \t\toffset += 2;
             """.formatted(offset, getterName, offset + 1, getterName);
 
@@ -71,50 +82,50 @@ public class SerializerProcessor extends AbstractProcessor {
             """::formatted;
 
     private static final BiFunction<Integer, String, String> SHORT_CONVERTER = (offset, getterName) -> """
-            \t\tresult[%s] = (byte) model.%s;
             \t\tresult[%s] = (byte) (model.%s >> 8);
+            \t\tresult[%s] = (byte) model.%s;
             \t\toffset += 2;
             """.formatted(offset, getterName, offset + 1, getterName);
 
     private static final BiFunction<Integer, String, String> INT_CONVERTER = (offset, getterName) -> """
-            \t\tresult[%s] = (byte)  model.%s;
-            \t\tresult[%s] = (byte) (model.%s >> 8);
-            \t\tresult[%s] = (byte) (model.%s >> 16);
             \t\tresult[%s] = (byte) (model.%s >> 24);
+            \t\tresult[%s] = (byte) (model.%s >> 16);
+            \t\tresult[%s] = (byte) (model.%s >> 8);
+            \t\tresult[%s] = (byte)  model.%s;
             \t\toffset += 4;
             """.formatted(offset, getterName, offset + 1, getterName, offset + 2, getterName, offset + 3, getterName);
 
     private static final BiFunction<Integer, String, String> LONG_CONVERTER = (offset, getterName) -> """
-            \t\tresult[%s] = (byte)  model.%s;
-            \t\tresult[%s] = (byte) (model.%s >> 8);
-            \t\tresult[%s] = (byte) (model.%s >> 16);
-            \t\tresult[%s] = (byte) (model.%s >> 24);
-            \t\tresult[%s] = (byte) (model.%s >> 32);
-            \t\tresult[%s] = (byte) (model.%s >> 40);
-            \t\tresult[%s] = (byte) (model.%s >> 48);
             \t\tresult[%s] = (byte) (model.%s >> 56);
+            \t\tresult[%s] = (byte) (model.%s >> 48);
+            \t\tresult[%s] = (byte) (model.%s >> 40);
+            \t\tresult[%s] = (byte) (model.%s >> 32);
+            \t\tresult[%s] = (byte) (model.%s >> 24);
+            \t\tresult[%s] = (byte) (model.%s >> 16);
+            \t\tresult[%s] = (byte) (model.%s >> 8);
+            \t\tresult[%s] = (byte)  model.%s;
             \t\toffset += 8;
             """.formatted(offset, getterName, offset + 1, getterName, offset + 2, getterName, offset + 3, getterName, offset + 4, getterName, offset + 5, getterName, offset + 6, getterName, offset + 7, getterName);
 
     private static final BiFunction<Integer, String, String> FLOAT_CONVERTER = (offset, getterName) -> """
             \t\tfloatBits = Float.floatToIntBits(model.%s);
-            \t\tresult[%s] = (byte)  floatBits;
-            \t\tresult[%s] = (byte) (floatBits >> 8);
-            \t\tresult[%s] = (byte) (floatBits >> 16);
             \t\tresult[%s] = (byte) (floatBits >> 24);
+            \t\tresult[%s] = (byte) (floatBits >> 16);
+            \t\tresult[%s] = (byte) (floatBits >> 8);
+            \t\tresult[%s] = (byte)  floatBits;
             \t\toffset += 4;
             """.formatted(getterName, offset, offset + 1, offset + 2, offset + 3);
 
     private static final BiFunction<Integer, String, String> DOUBLE_CONVERTER = (offset, getterName) -> """
             \t\tdoubleBits = Double.doubleToLongBits(model.%s);
-            \t\tresult[%s] = (byte)  doubleBits;
-            \t\tresult[%s] = (byte) (doubleBits >> 8);
-            \t\tresult[%s] = (byte) (doubleBits >> 16);
-            \t\tresult[%s] = (byte) (doubleBits >> 24);
-            \t\tresult[%s] = (byte) (doubleBits >> 32);
-            \t\tresult[%s] = (byte) (doubleBits >> 40);
-            \t\tresult[%s] = (byte) (doubleBits >> 48);
             \t\tresult[%s] = (byte) (doubleBits >> 56);
+            \t\tresult[%s] = (byte) (doubleBits >> 48);
+            \t\tresult[%s] = (byte) (doubleBits >> 40);
+            \t\tresult[%s] = (byte) (doubleBits >> 32);
+            \t\tresult[%s] = (byte) (doubleBits >> 24);
+            \t\tresult[%s] = (byte) (doubleBits >> 16);
+            \t\tresult[%s] = (byte) (doubleBits >> 8);
+            \t\tresult[%s] = (byte)  doubleBits;
             \t\toffset += 8;
             """.formatted(getterName, offset, offset + 1, offset + 2, offset + 3, offset + 4, offset + 5, offset + 6, offset + 7);
 
