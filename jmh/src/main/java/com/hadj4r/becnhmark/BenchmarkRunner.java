@@ -20,9 +20,9 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.openjdk.jmh.annotations.Mode.Throughput;
 import static org.openjdk.jmh.annotations.Scope.Thread;
 
-@Warmup(iterations = 3, time = 1)
-@Measurement(iterations = 7, time = 1)
-@Fork(1)
+@Warmup(iterations = 5, time = 1)
+@Measurement(iterations = 20, time = 1)
+@Fork(3)
 @BenchmarkMode(Throughput)
 @OutputTimeUnit(MILLISECONDS)
 @State(Thread)
@@ -44,7 +44,7 @@ public class BenchmarkRunner {
     }
 
     @Benchmark
-    public byte[] _000_Custom_Serialize() {
+    public byte[] _000_ProtoDryb_Serialize() {
         return IMMUTABLE_TEST_CLASS_SERIALIZER.serialize(immutableTestClass);
     }
 

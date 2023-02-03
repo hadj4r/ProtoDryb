@@ -35,5 +35,8 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Maven ###
 /core/target/
 /jmh/target/
+/target/
