@@ -1,0 +1,18 @@
+namespace com.hadj4r.model.flatbuffers;
+
+table FlatbuffersModel {
+    boolean_var: bool;
+    short_var: short;
+    int_var: int32;
+    long_var: int64;
+    float_var: float;
+    double_var: double;
+    string_var: string;
+    string_var2: string;
+    boolean_array_var: [bool];
+    short_array_var: [short];
+    int_array_var: [int32];
+    long_array_var: [int64];
+    float_array_var: [float];
+    double_array_var: [double];
+}

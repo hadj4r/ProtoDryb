@@ -5,9 +5,10 @@ import com.dslplatform.json.JsonWriter;
 import com.dslplatform.json.runtime.Settings;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.flatbuffers.FlatBufferBuilder;
 import com.hadj4r.model.ImmutableModel;
 import com.hadj4r.model.ImmutableModelSerializer;
-import com.hadj4r.model.proto.ImmutableModelOuterClass;
+import com.hadj4r.model.proto.ProtoModelOuterClass.ProtoModel;
 import java.io.IOException;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -33,8 +34,9 @@ public class BenchmarkRunner {
     private static final DslJson<Object> DSL_JSON = new DslJson<>(Settings.withRuntime().allowArrayFormat(true).includeServiceLoader());
     private static final JsonWriter WRITER = DSL_JSON.newWriter();
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final FlatBufferBuilder FLAT_BUFFER_BUILDER = new FlatBufferBuilder(0);
     private ImmutableModel immutableModel;
-    private ImmutableModelOuterClass.ImmutableModel immutableModelProto;
+    private ProtoModel immutableModelProto;
 
     public static void main(String[] args) throws IOException {
         org.openjdk.jmh.Main.main(args);
@@ -42,52 +44,11 @@ public class BenchmarkRunner {
 
     @Setup
     public void setup() {
-        immutableModel = ImmutableModel.builder()
-                .setBooleanVar(true)
-                .setShortVar((short) 2)
-                .setIntVar(3)
-                .setLongVar(4L)
-                .setFloatVar(5.0f)
-                .setDoubleVar(6.0)
-                .setStringVar("test")
-                .setStringVar2("another test")
-                .setBooleanArrayVar(new boolean[]{false, true, false})
-                .setShortArrayVar(new short[]{4, 5, 6})
-                .setIntArrayVar(new int[]{7, 8, 9})
-                .setLongArrayVar(new long[]{10L, 11L, 12L})
-                .setFloatArrayVar(new float[]{13.0f, 14.0f, 15.0f})
-                .setDoubleArrayVar(new double[]{16.0, 17.0, 18.0})
-                .build();
+        initPojo();
 
-        immutableModelProto = ImmutableModelOuterClass.ImmutableModel.newBuilder()
-                .setBooleanVar(true)
-                .setShortVar(2)
-                .setIntVar(3)
-                .setLongVar(4L)
-                .setFloatVar(5.0f)
-                .setDoubleVar(6.0)
-                .setStringVar("test")
-                .setStringVar2("another test")
-                .addBooleanArrayVar(false)
-                .addBooleanArrayVar(true)
-                .addBooleanArrayVar(false)
-                .addShortArrayVar(4)
-                .addShortArrayVar(5)
-                .addShortArrayVar(6)
-                .addIntArrayVar(7)
-                .addIntArrayVar(8)
-                .addIntArrayVar(9)
-                .addLongArrayVar(10L)
-                .addLongArrayVar(11L)
-                .addLongArrayVar(12L)
-                .addFloatArrayVar(13.0f)
-                .addFloatArrayVar(14.0f)
-                .addFloatArrayVar(15.0f)
-                .addDoubleArrayVar(16.0)
-                .addDoubleArrayVar(17.0)
-                .addDoubleArrayVar(18.0)
-                .build();
+        initProtoPojo();
 
+        initFlatBuffersPojo();
     }
 
     @Benchmark
@@ -111,6 +72,12 @@ public class BenchmarkRunner {
     public byte[] _300_ProtoBuf_Serialize() {
         return immutableModelProto.toByteArray();
     }
+
+    @Benchmark
+    public byte[] _400_FlatBuffers_Serialize() {
+        return FLAT_BUFFER_BUILDER.sizedByteArray();
+    }
+
 
     // TODO remove this after adding actual bitpacking
     // @Benchmark
@@ -189,4 +156,82 @@ public class BenchmarkRunner {
     //     bytes[9] = (byte) (i >> 24);
     //     return bytes;
     // }
+    private void initPojo() {
+        immutableModel = ImmutableModel.builder()
+                .setBooleanVar(true)
+                .setShortVar((short) 2)
+                .setIntVar(3)
+                .setLongVar(4L)
+                .setFloatVar(5.0f)
+                .setDoubleVar(6.0)
+                .setStringVar("test")
+                .setStringVar2("another test")
+                .setBooleanArrayVar(new boolean[]{false, true, false})
+                .setShortArrayVar(new short[]{4, 5, 6})
+                .setIntArrayVar(new int[]{7, 8, 9})
+                .setLongArrayVar(new long[]{10L, 11L, 12L})
+                .setFloatArrayVar(new float[]{13.0f, 14.0f, 15.0f})
+                .setDoubleArrayVar(new double[]{16.0, 17.0, 18.0})
+                .build();
+    }
+
+    private void initProtoPojo() {
+        immutableModelProto = ProtoModel.newBuilder()
+                .setBooleanVar(true)
+                .setShortVar(2)
+                .setIntVar(3)
+                .setLongVar(4L)
+                .setFloatVar(5.0f)
+                .setDoubleVar(6.0)
+                .setStringVar("test")
+                .setStringVar2("another test")
+                .addBooleanArrayVar(false)
+                .addBooleanArrayVar(true)
+                .addBooleanArrayVar(false)
+                .addShortArrayVar(4)
+                .addShortArrayVar(5)
+                .addShortArrayVar(6)
+                .addIntArrayVar(7)
+                .addIntArrayVar(8)
+                .addIntArrayVar(9)
+                .addLongArrayVar(10L)
+                .addLongArrayVar(11L)
+                .addLongArrayVar(12L)
+                .addFloatArrayVar(13.0f)
+                .addFloatArrayVar(14.0f)
+                .addFloatArrayVar(15.0f)
+                .addDoubleArrayVar(16.0)
+                .addDoubleArrayVar(17.0)
+                .addDoubleArrayVar(18.0)
+                .build();
+    }
+
+    private static void initFlatBuffersPojo() {
+        FLAT_BUFFER_BUILDER.clear();
+        final int stringVar = FLAT_BUFFER_BUILDER.createString("test");
+        final int stringVar2 = FLAT_BUFFER_BUILDER.createString("another test");
+        final int booleanArrVar = FlatbuffersModel.createBooleanArrayVarVector(FLAT_BUFFER_BUILDER, new boolean[]{false, true, false});
+        final int shortArrVar = FlatbuffersModel.createShortArrayVarVector(FLAT_BUFFER_BUILDER, new short[]{4, 5, 6});
+        final int intArrVar = FlatbuffersModel.createIntArrayVarVector(FLAT_BUFFER_BUILDER, new int[]{7, 8, 9});
+        final int longArrVar = FlatbuffersModel.createLongArrayVarVector(FLAT_BUFFER_BUILDER, new long[]{10L, 11L, 12L});
+        final int floatArrVar = FlatbuffersModel.createFloatArrayVarVector(FLAT_BUFFER_BUILDER, new float[]{13.0f, 14.0f, 15.0f});
+        final int doubleArrVar = FlatbuffersModel.createDoubleArrayVarVector(FLAT_BUFFER_BUILDER, new double[]{16.0, 17.0, 18.0});
+        FlatbuffersModel.startFlatbuffersModel(FLAT_BUFFER_BUILDER);
+        FlatbuffersModel.addBooleanVar(FLAT_BUFFER_BUILDER, true);
+        FlatbuffersModel.addShortVar(FLAT_BUFFER_BUILDER, (short) 2);
+        FlatbuffersModel.addIntVar(FLAT_BUFFER_BUILDER, 3);
+        FlatbuffersModel.addLongVar(FLAT_BUFFER_BUILDER, 4L);
+        FlatbuffersModel.addFloatVar(FLAT_BUFFER_BUILDER, 5.0f);
+        FlatbuffersModel.addDoubleVar(FLAT_BUFFER_BUILDER, 6.0);
+        FlatbuffersModel.addStringVar(FLAT_BUFFER_BUILDER, stringVar);
+        FlatbuffersModel.addStringVar2(FLAT_BUFFER_BUILDER, stringVar2);
+        FlatbuffersModel.addBooleanArrayVar(FLAT_BUFFER_BUILDER, booleanArrVar);
+        FlatbuffersModel.addShortArrayVar(FLAT_BUFFER_BUILDER, shortArrVar);
+        FlatbuffersModel.addIntArrayVar(FLAT_BUFFER_BUILDER, intArrVar);
+        FlatbuffersModel.addLongArrayVar(FLAT_BUFFER_BUILDER, longArrVar);
+        FlatbuffersModel.addFloatArrayVar(FLAT_BUFFER_BUILDER, floatArrVar);
+        FlatbuffersModel.addDoubleArrayVar(FLAT_BUFFER_BUILDER, doubleArrVar);
+        final int model = FlatbuffersModel.endFlatbuffersModel(FLAT_BUFFER_BUILDER);
+        FLAT_BUFFER_BUILDER.finish(model);
+    }
 }

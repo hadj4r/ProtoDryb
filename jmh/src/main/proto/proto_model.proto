@@ -1,7 +1,7 @@
 syntax = "proto3";
 package com.hadj4r.model.proto;
 
-message ImmutableModel {
+message ProtoModel {
     bool booleanVar = 1;
     sint32 shortVar = 2;
     sint32 intVar = 3;

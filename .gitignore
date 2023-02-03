@@ -43,3 +43,4 @@ out/
 
 ### Protobuf ###
 /jmh/src/main/java/com/hadj4r/model/proto/*
+/jmh/src/main/java/com/hadj4r/model/flatbuffers/*
