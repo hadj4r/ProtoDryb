@@ -9,7 +9,7 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
-import static helpful.utils.PrimitiveConverter.getWrapperClass;
+import static com.hadj4r.protodryb.utils.PrimitiveConverter.getWrapperClass;
 
 public class LambdaMetafactoryBeanAccessor implements BeanAccessor {
     private final Function getterFunction;

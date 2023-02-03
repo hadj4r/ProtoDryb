@@ -1,40 +1,79 @@
 package com.hadj4r.protodryb;
 
+import com.esotericsoftware.reflectasm.ConstructorAccess;
+import com.esotericsoftware.reflectasm.MethodAccess;
+import com.hadj4r.protodryb.utils.PrimitiveConverter;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Set;
-import lombok.RequiredArgsConstructor;
+import static com.hadj4r.protodryb.utils.PrimitiveConverter.getByteSize;
 
-@RequiredArgsConstructor
 public class ConverterInvocationHandler implements InvocationHandler {
-    private final Class<?> modelClass;
-    private final Set<Field> fields;
+    private final MethodAccess methodAccess;
+    private final ConstructorAccess<?> constructorAccess;
+    private final Class<?>[] fieldTypes;
+    private final byte[] byteSizes;
+    private final short byteSizesSum;
+    private final short byteSizeMax;
+    private final int[] getterMethodIndices;
+    private final int[] setterMethodIndices;
 
-    @Override
-    public Object invoke(final Object o, final Method method, final Object[] objects) throws Throwable {
-        // if method is encode then return encode method
-        if (method.getName().equals("encode")) {
-            return encode(objects[0]);
+    public ConverterInvocationHandler(final Class<?> modelClass, final Set<Field> fields) {
+        // calculate byte sizes
+        int i = 0;
+        short sum = 0;
+        this.fieldTypes = new Class<?>[fields.size()];
+        short currentByteMax = 0;
+        this.byteSizes = new byte[fields.size()];
+        for (final Field field : fields) {
+            fieldTypes[i] = field.getType();
+            byteSizes[i] = getByteSize(field.getType());
+            sum += byteSizes[i];
+            if (byteSizes[i] > currentByteMax) {
+                currentByteMax = byteSizes[i];
+            }
+            ++i;
         }
+        this.byteSizesSum = sum;
+        this.byteSizeMax = currentByteMax;
 
-        // if method is decode then return decode method
-        if (method.getName().equals("decode")) {
-            return decode((byte[]) objects[0]);
+        this.constructorAccess = ConstructorAccess.get(modelClass);
+        this.methodAccess = MethodAccess.get(modelClass);
+
+        // fill method indices
+        this.getterMethodIndices = new int[fields.size()];
+        this.setterMethodIndices = new int[fields.size()];
+        i = 0;
+        for (Field field : fields) {
+            final String name = field.getName();
+            // puts the index of the getter method
+            getterMethodIndices[i] = methodAccess.getIndex("get" + name.substring(0, 1).toUpperCase() + name.substring(1));
+            // puts the index of the setter method
+            setterMethodIndices[i] = methodAccess.getIndex("set" + name.substring(0, 1).toUpperCase() + name.substring(1));
+            ++i;
         }
-
-        throw new IllegalArgumentException("Method " + method.getName() + " is not declared in ByteConverter");
     }
 
-    private Object encode(final Object object) throws IllegalAccessException {
-        final int byteSize = calculateByteSize();   // TODO: not a const field bcs will differ based on non required fields/array fields
-        final byte[] bytes = new byte[byteSize];
+    @Override
+    public Object invoke(final Object o, final Method method, final Object[] objects) {
+        return switch (method.getName()) {
+            case "encode" -> encode(objects[0]);
+            case "decode" -> decode((byte[]) objects[0]);
+            default -> throw new UnsupportedOperationException("Method " + method.getName() + " is not supported");
+        };
+    }
+
+    private Object encode(final Object object) {
+        final int totalByteSize = calculateByteSize();   // TODO: not a const field bcs will differ based on non required fields/array fields
+        final byte[] bytes = new byte[totalByteSize];
         int offset = 0;
-        for (final Field field : fields) {
-            field.setAccessible(true);
-            final int fieldByteSize = javaTypeToByteSize(field.getType());
-            final byte[] fieldBytes = javaTypeToBytes(field.getType(), field.get(object));  // TODO: dont recreate fieldBytes array
+        final byte[] fieldBytes = new byte[byteSizeMax]; // for caching purpose
+        for (int i = 0; i < getterMethodIndices.length; ++i) {
+            final int fieldByteSize = byteSizes[i];
+            final Class<?> fieldType = fieldTypes[i];
+            final Object fieldValue = methodAccess.invoke(object, getterMethodIndices[i]);
+            PrimitiveConverter.toBytes(fieldType, fieldValue, fieldBytes);
             System.arraycopy(fieldBytes, 0, bytes, offset, fieldByteSize);
             offset += fieldByteSize;
         }
@@ -42,60 +81,22 @@ public class ConverterInvocationHandler implements InvocationHandler {
         return bytes;
     }
 
-    private Object decode(final byte[] bytes) throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
-        final Object newInstance = modelClass.getConstructor().newInstance();
-
+    private Object decode(final byte[] bytes) {
+        final Object newInstance = constructorAccess.newInstance();
         int offset = 0;
-        for (final Field field : fields) {
-            final int fieldByteSize = javaTypeToByteSize(field.getType());
-            final byte[] fieldBytes = new byte[fieldByteSize];
-            System.arraycopy(bytes, offset, fieldBytes, 0, fieldByteSize);
-            // set field value of newInstance to fieldBytes
-            field.set(newInstance, bytesToJavaType(field.getType(), fieldBytes));
+        Object fieldValue;
+        for (int i = 0; i < setterMethodIndices.length; ++i) {
+            final int fieldByteSize = byteSizes[i];
+            final Class<?> fieldType = fieldTypes[i];
+            fieldValue = PrimitiveConverter.fromBytes(fieldType, bytes, offset);
+            methodAccess.invoke(newInstance, setterMethodIndices[i], fieldValue);
             offset += fieldByteSize;
         }
+
         return newInstance;
     }
 
-    private byte[] javaTypeToBytes(final Class<?> type, final Object value) {
-        if (type == int.class) {
-            return intToBytes((int) value);
-        }
-        throw new IllegalArgumentException("Unsupported type " + type.getName());
-    }
-
-    private Object bytesToJavaType(final Class<?> type, final byte[] bytes) {
-        if (type == int.class) {
-            return bytesToInt(bytes);
-        }
-        throw new IllegalArgumentException("Unsupported type " + type.getName());
-    }
-
-    private byte[] intToBytes(final int value) {
-        return new byte[]{
-                (byte) (value >>> 24),
-                (byte) (value >>> 16),
-                (byte) (value >>> 8),
-                (byte) value
-        };
-    }
-
-    private int bytesToInt(final byte[] bytes) {
-        return bytes[0] << 24 | (bytes[1] & 0xFF) << 16 | (bytes[2] & 0xFF) << 8 | (bytes[3] & 0xFF);
-    }
-
     private int calculateByteSize() {
-        return fields.stream()
-                .map(Field::getType)
-                .mapToInt(this::javaTypeToByteSize)
-                .sum();
-    }
-
-    private int javaTypeToByteSize(final Class<?> typeClass) {
-        if (typeClass.equals(int.class)) {
-            return 4;
-        }
-        throw new IllegalArgumentException("Unsupported type " + typeClass.getName());
-
+        return byteSizesSum; // TODO: this is temporal until all fields are required
     }
 }

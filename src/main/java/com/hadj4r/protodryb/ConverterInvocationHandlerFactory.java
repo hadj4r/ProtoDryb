@@ -3,7 +3,6 @@ package com.hadj4r.protodryb;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -15,9 +14,19 @@ public class ConverterInvocationHandlerFactory {
 
     public ConverterInvocationHandler create(final Class<? extends ByteConverter> converterInterface) {
         final Class<?> modelClass = getModelClass(converterInterface);
-        final Set<Field> fields = getFieldsSortedByOrder(modelClass);
+
+        validateModelClass(modelClass);
+
+        final Set<Field> fields = getSerializedFieldsSortedByOrder(modelClass);
+
 
         return new ConverterInvocationHandler(modelClass, fields);
+    }
+
+    private void validateModelClass(final Class<?> clazz) {
+        if (!clazz.isAnnotationPresent(Convertable.class)) {
+            throw new IllegalArgumentException("Class " + clazz.getName() + " is not annotated with @Convertable");
+        }
     }
 
     private Class<?> getModelClass(final Class<? extends ByteConverter> converterInterface) {
@@ -25,7 +34,7 @@ public class ConverterInvocationHandlerFactory {
         return (Class<?>) genericInterface.getActualTypeArguments()[0];
     }
 
-    private Set<Field> getFieldsSortedByOrder(final Class<?> modelClass) {
+    private Set<Field> getSerializedFieldsSortedByOrder(final Class<?> modelClass) {
         final List<Field> annotatedFields = Arrays.stream(modelClass.getDeclaredFields())
                 .filter(f -> f.isAnnotationPresent(PrimitiveField.class))       // TODO: temporary, add more generic annotation
                 .collect(Collectors.toList());
@@ -33,8 +42,6 @@ public class ConverterInvocationHandlerFactory {
         validateFields(annotatedFields);
 
         return Arrays.stream(modelClass.getDeclaredFields())
-                .filter(f -> f.getAnnotation(PrimitiveField.class).required())  // TODO: temporary, move logic to comparator or extra set
-                .filter(f -> !Collection.class.isAssignableFrom(f.getType()))   // TODO: temporary
                 .collect(Collectors.toCollection(() -> new TreeSet<>(comparatorByOrder)));
     }
 
@@ -48,12 +55,17 @@ public class ConverterInvocationHandlerFactory {
         }
 
         int lastOrder = 0;
+        boolean isRequired = true;
         for (final Field field : annotatedFields) {
             final int order = field.getAnnotation(PrimitiveField.class).order();
-            field.setAccessible(true);  // TODO: unsafe & think where to put it
+            final boolean required = field.getAnnotation(PrimitiveField.class).required();
             if (order != ++lastOrder) {
                 throw new IllegalArgumentException("Field " + field.getName() + " has invalid order");
             }
+            if (!isRequired && required) {
+                throw new IllegalArgumentException("Field " + field.getName() + " is required but previous field is not");
+            }
+            isRequired = required;
         }
     }
 
