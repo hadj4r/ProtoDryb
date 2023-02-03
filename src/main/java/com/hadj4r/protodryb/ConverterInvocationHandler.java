@@ -48,7 +48,11 @@ public class ConverterInvocationHandler implements InvocationHandler {
         for (Field field : fields) {
             final String name = field.getName();
             // puts the index of the getter method
-            getterMethodIndices[i] = methodAccess.getIndex("get" + name.substring(0, 1).toUpperCase() + name.substring(1));
+            if (fieldTypes[i].equals(boolean.class)) {
+                getterMethodIndices[i] = methodAccess.getIndex("is" + name.substring(0, 1).toUpperCase() + name.substring(1));
+            } else {
+                getterMethodIndices[i] = methodAccess.getIndex("get" + name.substring(0, 1).toUpperCase() + name.substring(1));
+            }
             // puts the index of the setter method
             setterMethodIndices[i] = methodAccess.getIndex("set" + name.substring(0, 1).toUpperCase() + name.substring(1));
             ++i;
@@ -68,13 +72,11 @@ public class ConverterInvocationHandler implements InvocationHandler {
         final int totalByteSize = calculateByteSize();   // TODO: not a const field bcs will differ based on non required fields/array fields
         final byte[] bytes = new byte[totalByteSize];
         int offset = 0;
-        final byte[] fieldBytes = new byte[byteSizeMax]; // for caching purpose
         for (int i = 0; i < getterMethodIndices.length; ++i) {
             final int fieldByteSize = byteSizes[i];
             final Class<?> fieldType = fieldTypes[i];
             final Object fieldValue = methodAccess.invoke(object, getterMethodIndices[i]);
-            PrimitiveConverter.toBytes(fieldType, fieldValue, fieldBytes);
-            System.arraycopy(fieldBytes, 0, bytes, offset, fieldByteSize);
+            PrimitiveConverter.toBytes(fieldType, fieldValue, bytes, offset);
             offset += fieldByteSize;
         }
 

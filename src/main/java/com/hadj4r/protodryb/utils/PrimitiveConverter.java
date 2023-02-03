@@ -1,5 +1,7 @@
 package com.hadj4r.protodryb.utils;
 
+import java.util.Arrays;
+
 public final class PrimitiveConverter {
     // for caching purposes
     private static final byte[] $1_BYTE_ARRAY = new byte[1];
@@ -54,92 +56,70 @@ public final class PrimitiveConverter {
         throw new IllegalArgumentException("Unknown primitive type: " + clazz); // TODO: add this later
     }
 
-    public static void toBytes(final Class<?> clazz, final Object fieldValue, final byte[] fieldBytes) {
-        final byte[] bytes;
+    public static void toBytes(final Class<?> clazz, final Object fieldValue, final byte[] bytes, final int offset) {
         if (clazz == boolean.class) {
-            bytes = booleanToBytes((boolean) fieldValue);
+            booleanToBytes((boolean) fieldValue, bytes, offset);
         } else if (clazz == char.class) {
-            bytes = charToBytes((char) fieldValue);
+            charToBytes((char) fieldValue, bytes, offset);
         } else if (clazz == byte.class) {
-            bytes = byteToBytes((byte) fieldValue);
+            byteToBytes((byte) fieldValue, bytes, offset);
         } else if (clazz == short.class) {
-            bytes = shortToBytes((short) fieldValue);
+            shortToBytes((short) fieldValue, bytes, offset);
         } else if (clazz == int.class) {
-            bytes = intToBytes((int) fieldValue);
+            intToBytes((int) fieldValue, bytes, offset);
         } else if (clazz == long.class) {
-            bytes = longToBytes((long) fieldValue);
+            longToBytes((long) fieldValue, bytes, offset);
         } else if (clazz == float.class) {
-            bytes = floatToBytes((float) fieldValue);
+            floatToBytes((float) fieldValue, bytes, offset);
         } else if (clazz == double.class) {
-            bytes = doubleToBytes((double) fieldValue);
+            doubleToBytes((double) fieldValue, bytes, offset);
         } else {
             throw new IllegalArgumentException("Unknown primitive type: " + clazz); // TODO: add this later
         }
-        System.arraycopy(bytes, 0, fieldBytes, 0, bytes.length);
     }
 
-    private static byte[] booleanToBytes(final boolean value) {
-        $1_BYTE_ARRAY[0] = (byte) (value ? 1 : 0);
-        return $1_BYTE_ARRAY;
+    private static void booleanToBytes(final boolean value, final byte[] fieldBytes, final int offset) {
+        fieldBytes[offset] = (byte) (value ? 1 : 0);
     }
 
-    private static byte[] charToBytes(final char value) {
-        $2_BYTE_ARRAY[0] = (byte) (value >> 8);
-        $2_BYTE_ARRAY[1] = (byte) value;
-        return $2_BYTE_ARRAY;
+    private static void charToBytes(final char value, final byte[] bytes, final int offset) {
+        bytes[offset] = (byte) value;
+        bytes[offset + 1] = (byte) (value >> 8);
     }
 
-    private static byte[] byteToBytes(final byte value) {
-        $1_BYTE_ARRAY[0] = value;
-        return $1_BYTE_ARRAY;
+    private static void byteToBytes(final byte value, final byte[] bytes, final int offset) {
+        bytes[offset] = value;
     }
 
-    private static byte[] shortToBytes(final short value) {
-        $2_BYTE_ARRAY[0] = (byte) (value >> 8);
-        $2_BYTE_ARRAY[1] = (byte) value;
-        return $2_BYTE_ARRAY;
+    private static void shortToBytes(final short value, final byte[] bytes, final int offset) {
+        bytes[offset] = (byte) value;
+        bytes[offset + 1] = (byte) (value >> 8);
     }
 
-    private static byte[] intToBytes(final int value) {
-        $4_BYTE_ARRAY[0] = (byte) (value >> 24);
-        $4_BYTE_ARRAY[1] = (byte) (value >> 16);
-        $4_BYTE_ARRAY[2] = (byte) (value >> 8);
-        $4_BYTE_ARRAY[3] = (byte) value;
-        return $4_BYTE_ARRAY;
+    private static void intToBytes(final int value, final byte[] bytes, final int offset) {
+        bytes[offset] = (byte) value;
+        bytes[offset + 1] = (byte) (value >> 8);
+        bytes[offset + 2] = (byte) (value >> 16);
+        bytes[offset + 3] = (byte) (value >> 24);
     }
 
-    private static byte[] longToBytes(long value) {
-        return set8BytesArray(value);
+    private static void longToBytes(long value, final byte[] bytes, final int offset) {
+        bytes[offset] = (byte) value;
+        bytes[offset + 1] = (byte) (value >> 8);
+        bytes[offset + 2] = (byte) (value >> 16);
+        bytes[offset + 3] = (byte) (value >> 24);
+        bytes[offset + 4] = (byte) (value >> 32);
+        bytes[offset + 5] = (byte) (value >> 40);
+        bytes[offset + 6] = (byte) (value >> 48);
+        bytes[offset + 7] = (byte) (value >> 56);
     }
 
-    private static byte[] floatToBytes(final float value) {
-        final int data = Float.floatToIntBits(value);
-        return set4BytesArray(data);
+    private static void floatToBytes(final float value, final byte[] bytes, final int offset) {
+        intToBytes(Float.floatToIntBits(value), bytes, offset);
     }
 
-    private static byte[] doubleToBytes(final double value) {
-        final long data = Double.doubleToLongBits(value);
-        return set8BytesArray(data);
-    }
-
-    private static byte[] set4BytesArray(final int data) {
-        $4_BYTE_ARRAY[0] = (byte) (data >> 24);
-        $4_BYTE_ARRAY[1] = (byte) (data >> 16);
-        $4_BYTE_ARRAY[2] = (byte) (data >> 8);
-        $4_BYTE_ARRAY[3] = (byte) data;
-        return $4_BYTE_ARRAY;
-    }
-
-    private static byte[] set8BytesArray(final long data) {
-        $8_BYTE_ARRAY[0] = (byte) (data >> 56);
-        $8_BYTE_ARRAY[1] = (byte) (data >> 48);
-        $8_BYTE_ARRAY[2] = (byte) (data >> 40);
-        $8_BYTE_ARRAY[3] = (byte) (data >> 32);
-        $8_BYTE_ARRAY[4] = (byte) (data >> 24);
-        $8_BYTE_ARRAY[5] = (byte) (data >> 16);
-        $8_BYTE_ARRAY[6] = (byte) (data >> 8);
-        $8_BYTE_ARRAY[7] = (byte) data;
-        return $8_BYTE_ARRAY;
+    private static void doubleToBytes(final double value, final byte[] bytes, final int offset) {
+        longToBytes(Double.doubleToLongBits(value), bytes, offset);
     }
 
     public static Object fromBytes(final Class<?> clazz, final byte[] allBytes, final int offset) {
@@ -163,43 +143,43 @@ public final class PrimitiveConverter {
         throw new IllegalArgumentException("Unknown primitive type: " + clazz); // TODO: add this later
     }
 
-    private static Object bytesToBoolean(final byte[] allBytes, final int offset) {
+    private static boolean bytesToBoolean(final byte[] allBytes, final int offset) {
         return allBytes[offset] == 1;
     }
 
-    private static Object bytesToChar(final byte[] allBytes, final int offset) {
-        return (char) ((allBytes[offset] << 8) + (allBytes[offset + 1] & 0xff));
+    private static char bytesToChar(final byte[] allBytes, final int offset) {
+        return (char) ((allBytes[offset + 1] << 8) | (allBytes[offset] & 0xff));
     }
 
-    private static Object bytesToByte(final byte[] allBytes, final int offset) {
+    private static byte bytesToByte(final byte[] allBytes, final int offset) {
         return allBytes[offset];
     }
 
-    private static Object bytesToShort(final byte[] allBytes, final int offset) {
-        return (short) ((allBytes[offset] << 8) + (allBytes[offset + 1] & 0xff));
+    private static short bytesToShort(final byte[] allBytes, final int offset) {
+        return (short) ((allBytes[offset + 1] << 8) | (allBytes[offset] & 0xff));
     }
 
-    private static Object bytesToInt(final byte[] allBytes, final int offset) {
+    private static int bytesToInt(final byte[] allBytes, final int offset) {
         return fourBytesToInt(allBytes, offset);
     }
 
-    private static Object bytesToLong(final byte[] allBytes, final int offset) {
-        return eightBytesToLong(allBytes, offset);
+    private static long bytesToLong(final byte[] allBytes, final int offset) {
+        return fourBytesToLong(allBytes, offset);
     }
 
-    private static Object bytesToFloat(final byte[] allBytes, final int offset) {
+    private static float bytesToFloat(final byte[] allBytes, final int offset) {
         return Float.intBitsToFloat(fourBytesToInt(allBytes, offset));
     }
 
-    private static Object bytesToDouble(final byte[] allBytes, final int offset) {
-        return Double.longBitsToDouble(eightBytesToLong(allBytes, offset));
+    private static double bytesToDouble(final byte[] allBytes, final int offset) {
+        return Double.longBitsToDouble(fourBytesToLong(allBytes, offset));
     }
 
     private static int fourBytesToInt(final byte[] allBytes, final int offset) {
-        return (allBytes[offset] << 24) + ((allBytes[offset + 1] & 0xff) << 16) + ((allBytes[offset + 2] & 0xff) << 8) + (allBytes[offset + 3] & 0xff);
+        return (allBytes[offset + 3] << 24) | ((allBytes[offset + 2] & 0xff) << 16) | ((allBytes[offset + 1] & 0xff) << 8) | (allBytes[offset] & 0xff);
     }
 
-    private static long eightBytesToLong(final byte[] allBytes, final int offset) {
-        return ((long) allBytes[offset] << 56) + ((long) (allBytes[offset + 1] & 0xff) << 48) + ((long) (allBytes[offset + 2] & 0xff) << 40) + ((long) (allBytes[offset + 3] & 0xff) << 32) + ((long) (allBytes[offset + 4] & 0xff) << 24) + ((allBytes[offset + 5] & 0xff) << 16) + ((allBytes[offset + 6] & 0xff) << 8) + (allBytes[offset + 7] & 0xff);
+    private static long fourBytesToLong(final byte[] allBytes, final int offset) {
+        return ((long) allBytes[offset + 7] << 56) | ((long) (allBytes[offset + 6] & 0xff) << 48) | ((long) (allBytes[offset + 5] & 0xff) << 40) | ((long) (allBytes[offset + 4] & 0xff) << 32) | ((long) (allBytes[offset + 3] & 0xff) << 24) | ((allBytes[offset + 2] & 0xff) << 16) | ((allBytes[offset + 1] & 0xff) << 8) | (allBytes[offset] & 0xff);
     }
 }
