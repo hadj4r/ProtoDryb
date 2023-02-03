@@ -1,0 +1,19 @@
+syntax = "proto3";
+package com.hadj4r.model.proto;
+
+message ImmutableModel {
+    bool booleanVar = 1;
+    sint32 shortVar = 2;
+    sint32 intVar = 3;
+    sint64 longVar = 4;
+    float floatVar = 5;
+    double doubleVar = 6;
+    string stringVar = 7;
+    string stringVar2 = 8;
+    repeated bool booleanArrayVar = 9;
+    repeated sint32 shortArrayVar = 10;
+    repeated sint32 intArrayVar = 11;
+    repeated sint64 longArrayVar = 12;
+    repeated float floatArrayVar = 13;
+    repeated double doubleArrayVar = 14;
+}

@@ -40,3 +40,6 @@ out/
 /core/target/
 /jmh/target/
 /target/
+
+### Protobuf ###
+/jmh/src/main/java/com/hadj4r/model/proto/*

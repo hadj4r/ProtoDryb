@@ -45,6 +45,12 @@
             <artifactId>dsl-json-java8</artifactId>
             <version>1.10.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>3.21.12</version>
+        </dependency>
+
     </dependencies>
 
 </project>

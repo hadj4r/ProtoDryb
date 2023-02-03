@@ -3,9 +3,10 @@ package com.hadj4r.model;
 
 import com.dslplatform.json.CompiledJson;
 import static com.dslplatform.json.CompiledJson.Behavior.FAIL;
+import static com.dslplatform.json.CompiledJson.Format.ARRAY;
 import static com.dslplatform.json.CompiledJson.Format.OBJECT;
 
-public class ImmutableTestClass {
+public class ImmutableModel {
     private final boolean booleanVar;
     private final short shortVar;
     private final int intVar;
@@ -21,12 +22,12 @@ public class ImmutableTestClass {
     private final float[] floatArrayVar;
     private final double[] doubleArrayVar;
 
-    @CompiledJson(onUnknown = FAIL, formats = OBJECT)
-    public ImmutableTestClass(final boolean booleanVar, final short shortVar,
-                              final int intVar, final long longVar, final float floatVar, final double doubleVar,
-                              final String stringVar, final String stringVar2, final boolean[] booleanArrayVar,
-                              final short[] shortArrayVar, final int[] intArrayVar, final long[] longArrayVar,
-                              final float[] floatArrayVar, final double[] doubleArrayVar) {
+    @CompiledJson(onUnknown = FAIL, formats = {OBJECT, ARRAY})
+    public ImmutableModel(final boolean booleanVar, final short shortVar,
+                          final int intVar, final long longVar, final float floatVar, final double doubleVar,
+                          final String stringVar, final String stringVar2, final boolean[] booleanArrayVar,
+                          final short[] shortArrayVar, final int[] intArrayVar, final long[] longArrayVar,
+                          final float[] floatArrayVar, final double[] doubleArrayVar) {
         this.booleanVar = booleanVar;
         this.shortVar = shortVar;
         this.intVar = intVar;
@@ -189,8 +190,8 @@ public class ImmutableTestClass {
             return this;
         }
 
-        public ImmutableTestClass build() {
-            return new ImmutableTestClass(booleanVar, shortVar, intVar, longVar, floatVar, doubleVar,
+        public ImmutableModel build() {
+            return new ImmutableModel(booleanVar, shortVar, intVar, longVar, floatVar, doubleVar,
                     stringVar, stringVar2, booleanArrayVar, shortArrayVar, intArrayVar,
                     longArrayVar, floatArrayVar, doubleArrayVar);
         }

@@ -5,8 +5,9 @@ import com.dslplatform.json.JsonWriter;
 import com.dslplatform.json.runtime.Settings;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hadj4r.model.ImmutableTestClass;
-import com.hadj4r.model.ImmutableTestClassSerializer;
+import com.hadj4r.model.ImmutableModel;
+import com.hadj4r.model.ImmutableModelSerializer;
+import com.hadj4r.model.proto.ImmutableModelOuterClass;
 import java.io.IOException;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -16,23 +17,24 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
-import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.openjdk.jmh.annotations.Mode.Throughput;
 import static org.openjdk.jmh.annotations.Scope.Thread;
 
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 20, time = 1)
-@Fork(3)
+@Fork(1)
 @BenchmarkMode(Throughput)
-@OutputTimeUnit(MICROSECONDS)
+@OutputTimeUnit(MILLISECONDS)
 @State(Thread)
 public class BenchmarkRunner {
 
-    private static final ImmutableTestClassSerializer IMMUTABLE_TEST_CLASS_SERIALIZER = ImmutableTestClassSerializer.INSTANCE;
+    private static final ImmutableModelSerializer IMMUTABLE_MODEL_SERIALIZER = ImmutableModelSerializer.INSTANCE;
     private static final DslJson<Object> DSL_JSON = new DslJson<>(Settings.withRuntime().allowArrayFormat(true).includeServiceLoader());
     private static final JsonWriter WRITER = DSL_JSON.newWriter();
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private ImmutableTestClass immutableTestClass;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private ImmutableModel immutableModel;
+    private ImmutableModelOuterClass.ImmutableModel immutableModelProto;
 
     public static void main(String[] args) throws IOException {
         org.openjdk.jmh.Main.main(args);
@@ -40,7 +42,7 @@ public class BenchmarkRunner {
 
     @Setup
     public void setup() {
-        immutableTestClass = ImmutableTestClass.builder()
+        immutableModel = ImmutableModel.builder()
                 .setBooleanVar(true)
                 .setShortVar((short) 2)
                 .setIntVar(3)
@@ -56,23 +58,58 @@ public class BenchmarkRunner {
                 .setFloatArrayVar(new float[]{13.0f, 14.0f, 15.0f})
                 .setDoubleArrayVar(new double[]{16.0, 17.0, 18.0})
                 .build();
+
+        immutableModelProto = ImmutableModelOuterClass.ImmutableModel.newBuilder()
+                .setBooleanVar(true)
+                .setShortVar(2)
+                .setIntVar(3)
+                .setLongVar(4L)
+                .setFloatVar(5.0f)
+                .setDoubleVar(6.0)
+                .setStringVar("test")
+                .setStringVar2("another test")
+                .addBooleanArrayVar(false)
+                .addBooleanArrayVar(true)
+                .addBooleanArrayVar(false)
+                .addShortArrayVar(4)
+                .addShortArrayVar(5)
+                .addShortArrayVar(6)
+                .addIntArrayVar(7)
+                .addIntArrayVar(8)
+                .addIntArrayVar(9)
+                .addLongArrayVar(10L)
+                .addLongArrayVar(11L)
+                .addLongArrayVar(12L)
+                .addFloatArrayVar(13.0f)
+                .addFloatArrayVar(14.0f)
+                .addFloatArrayVar(15.0f)
+                .addDoubleArrayVar(16.0)
+                .addDoubleArrayVar(17.0)
+                .addDoubleArrayVar(18.0)
+                .build();
+
     }
 
     @Benchmark
     public byte[] _000_ProtoDryb_Serialize() {
-        return IMMUTABLE_TEST_CLASS_SERIALIZER.serialize(immutableTestClass);
+        return IMMUTABLE_MODEL_SERIALIZER.serialize(immutableModel);
     }
 
     @Benchmark
     public byte[] _100_Jackson_Serialize() throws JsonProcessingException {
-        return objectMapper.writeValueAsBytes(immutableTestClass);
+        return OBJECT_MAPPER.writeValueAsBytes(immutableModel);
     }
 
     @Benchmark
     public byte[] _200_DslJson_Serialize() throws IOException {
         WRITER.reset();
-        DSL_JSON.serialize(WRITER, immutableTestClass);
+        DSL_JSON.serialize(WRITER, immutableModel);
         return WRITER.toByteArray();
+    }
+
+    @Benchmark
+    public byte[] _300_ProtoBuf_Serialize() {
+        return immutableModelProto.toByteArray();
     }
 
     // TODO remove this after adding actual bitpacking
