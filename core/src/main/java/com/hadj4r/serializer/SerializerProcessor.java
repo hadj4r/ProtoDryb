@@ -43,15 +43,24 @@ public class SerializerProcessor extends AbstractProcessor {
 
     private static final String END_OF_ELEMENT_TYPE = "}";
 
+    private static final String BOOLEAN = "boolean";
+    private static final String BYTE = "byte";
+    private static final String CHAR = "char";
+    private static final String SHORT = "short";
+    private static final String INT = "int";
+    private static final String LONG = "long";
+    private static final String FLOAT = "float";
+    public static final String DOUBLE = "double";
+
     private static final Map<String, Integer> PRIMITIVE_TYPE_TO_SIZE = Map.of(
-            "boolean", 1,
-            "char", 2,
-            "byte", 1,
-            "short", 2,
-            "int", 4,
-            "long", 8,
-            "float", 4,
-            "double", 8
+            BOOLEAN, 1,
+            CHAR, 2,
+            BYTE, 1,
+            SHORT, 2,
+            INT, 4,
+            LONG, 8,
+            FLOAT, 4,
+            DOUBLE, 8
     );
 
     private static final Map<Integer, String> SHIFT_TO_HEX_COVER = Map.of(
@@ -133,148 +142,173 @@ public class SerializerProcessor extends AbstractProcessor {
             \t\tcom.hadj4r.serializer.util.UTF8Utils.stringToUTF8BytesArray(model.%s, result, offset);
             """::formatted;
     private static final Map<String, BiFunction<Integer, String, String>> PRIMITIVE_TYPE_TO_FUNCTION = Map.of(
-            "boolean", BOOLEAN_CONVERTER,
-            "char", CHAR_CONVERTER,
-            "byte", BYTE_CONVERTER,
-            "short", SHORT_CONVERTER,
-            "int", INT_CONVERTER,
-            "long", LONG_CONVERTER,
-            "float", FLOAT_CONVERTER,
-            "double", DOUBLE_CONVERTER
+            BOOLEAN, BOOLEAN_CONVERTER,
+            CHAR, CHAR_CONVERTER,
+            BYTE, BYTE_CONVERTER,
+            SHORT, SHORT_CONVERTER,
+            INT, INT_CONVERTER,
+            LONG, LONG_CONVERTER,
+            FLOAT, FLOAT_CONVERTER,
+            DOUBLE, DOUBLE_CONVERTER
             );
 
     @Override
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
         annotations.stream()
                 .flatMap(annotation -> roundEnv.getElementsAnnotatedWith(annotation).stream())
-                .forEach(e -> generateBuilderClass(e, roundEnv));
+                .forEach(e -> generateSerializerServiceImplementationClass(e, roundEnv));
 
         return true;
     }
 
-    private void generateBuilderClass(final Element element, final RoundEnvironment roundEnv) {
-        String className = element.getSimpleName().toString();
-        String packageName = element.getEnclosingElement().toString();
-        String serializerName = className + "Impl";
-        String serializerFullName = packageName + "." + serializerName;
+    private void generateSerializerServiceImplementationClass(final Element element, final RoundEnvironment roundEnv) {
+        final String className = element.getSimpleName().toString();
+        final String packageName = element.getEnclosingElement().toString();
+        final String serializerName = className + "Impl";
+        final String serializerFullName = packageName + "." + serializerName;
 
         // retrieve the interface class
-        TypeElement typeElement = (TypeElement)element;
-        DeclaredType declaredType = (DeclaredType)typeElement.getInterfaces().get(0);
+        final TypeElement typeElement = (TypeElement)element;
+        final DeclaredType declaredType = (DeclaredType)typeElement.getInterfaces().get(0);
         final String modelFullName = declaredType.getTypeArguments().get(0).toString();
 
         final StringBuilder sb = new StringBuilder();
 
-        try (final PrintWriter writer = new PrintWriter(
-                processingEnv.getFiler().createSourceFile(serializerFullName).openWriter())) {
-            sb
-                    .append(BUILDER_CLASS_SIGNATURE.formatted(packageName, serializerName, className))
-                    .append(SERIALIZE_METHOD_SIGNATURE.formatted(modelFullName));
+        try (final PrintWriter writer = getPrintWriter(serializerFullName)) {
+            processHeader(className, packageName, serializerName, modelFullName, sb);
 
-            Element modelClass = roundEnv.getRootElements().stream()
-                    .filter(e -> modelFullName.equals(e.toString())).findFirst()
-                    .orElseThrow(() -> new RuntimeException("Could not find model class"));
-
-            List<? extends Element> modelFields = modelClass.getEnclosedElements().stream()
-                    .filter(e -> FIELD.equals(e.getKind()))
-                    .toList();
-
-            int modelSize = 0;
-            Set<String> stringFieldsFirstLevel = new HashSet<>();
-            for (final Element field : modelFields) {
-                final String fieldType = field.asType().toString();
-                final Optional<Integer> optionalSize = Optional.ofNullable(PRIMITIVE_TYPE_TO_SIZE.get(fieldType));
-                if (optionalSize.isPresent()) {
-                    modelSize += optionalSize.get();
-                } else if (fieldType.equals("java.lang.String")) {
-                    stringFieldsFirstLevel.add(field.getSimpleName().toString());
-                }
-            }
-
-            boolean hasDynamicSize = !stringFieldsFirstLevel.isEmpty();
+            final Element modelClass = getModelClass(roundEnv, modelFullName);
+            final List<? extends Element> modelFields = getModelFields(modelClass);
             final Map<String, String> stringFieldFirstLevelGetterToSize = new HashMap<>();
-            if (hasDynamicSize) {
-                sb
-                        .append("\t\tint modelDynamicSize = 0;\n");
-                final List<String> stringFieldsFirstLayerGetters = stringFieldsFirstLevel.stream()
-                        .map(s -> "get" + s.substring(0, 1).toUpperCase() + s.substring(1) + "()")
-                        .toList();
-                for (int i = 0; i < stringFieldsFirstLayerGetters.size(); ++i) {
-                    // create unique variable name containing the byte array size
-                    final String byteArraySize = "byteArraySize" + i;
-                    stringFieldFirstLevelGetterToSize.put(stringFieldsFirstLayerGetters.get(i), byteArraySize);
-                    sb
-                            .append("\t\tint %s = 1 + com.hadj4r.serializer.util.UTF8Utils.utf8StringByteArrayLength(model.%s);%n"
-                                    .formatted(byteArraySize, stringFieldsFirstLayerGetters.get(i)))
-                            .append("\t\tmodelDynamicSize += %s;%n"
-                                    .formatted(byteArraySize));
-                }
-            }
 
-            sb
-                    .append("\t\tbyte[] result = new byte[")
-                    .append(modelSize)
-                    .append(" + ")
-                    .append("modelDynamicSize")
-                    .append("];\n\n");
-
-            final boolean hasFloatField = modelFields.stream()
-                    .anyMatch(e -> "float".equals(e.asType().toString()));
-
-            if (hasFloatField) {
-                sb
-                        .append(FLOAT_BITS_VARIABLE_DECLARATION)
-                        .append('\n');
-            }
-
-            final boolean hasDoubleField = modelFields.stream()
-                    .anyMatch(e -> "double".equals(e.asType().toString()));
-
-            if (hasDoubleField) {
-                sb
-                        .append(DOUBLE_BITS_VARIABLE_DECLARATION)
-                        .append('\n');
-            }
-
-            sb
-                    .append("\t\tint offset = 0;\n\n");
-
-            int offset = 0;
-            for (final Element field : modelFields) {
-                final String fieldType = field.asType().toString();
-                final String fieldName = field.getSimpleName().toString();
-                final String getterName = ("boolean".equals(fieldType) ? "is" : "get") +
-                                          fieldName.substring(0, 1).toUpperCase() +
-                                          fieldName.substring(1) + "()";
-
-                final Optional<BiFunction<Integer, String, String>> primitiveToFunction = Optional.ofNullable(
-                        PRIMITIVE_TYPE_TO_FUNCTION.get(fieldType));
-                if (primitiveToFunction.isPresent()) {
-                    final String primitiveVariableConversation = primitiveToFunction.get().apply(offset, getterName);
-                    sb
-                            .append(primitiveVariableConversation)
-                            .append('\n');
-
-                    offset += PRIMITIVE_TYPE_TO_SIZE.get(fieldType); // doesn't recheck the type because it is already checked above
-                } else if (fieldType.equals("java.lang.String")) {
-                    sb
-                            .append(STRING_CONVERTER.apply(getterName).formatted(getterName))
-                            // increase offset by the size of the byte array (already calculated)
-                            .append("\t\toffset += %s;%n".formatted(stringFieldFirstLevelGetterToSize.get(getterName)))
-                            .append('\n');
-                }
-            }
-
-            sb
-                    .append("\t\treturn result;\n\t")
-                    .append(END_OF_ELEMENT_TYPE) // end of serialize method
-                    .append('\n')
-                    .append(END_OF_ELEMENT_TYPE); // end of class
+            calculateFinalByteArraySize(sb, modelFields, stringFieldFirstLevelGetterToSize);
+            addFloatAndDoubleFieldsForCachingIfNecessary(sb, modelFields);
+            processFieldsSerialization(sb, modelFields, stringFieldFirstLevelGetterToSize);
+            processTail(sb);
 
             writer.write(sb.toString());
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static void processFieldsSerialization(final StringBuilder sb, final List<? extends Element> modelFields, final Map<String, String> stringFieldFirstLevelGetterToSize) {
+        sb.append("\t\tint offset = 0;\n\n");
+        int offset = 0;
+        for (final Element field : modelFields) {
+            final String fieldType = field.asType().toString();
+            final String fieldName = field.getSimpleName().toString();
+            final String getterName = (BOOLEAN.equals(fieldType) ? "is" : "get") +
+                                      fieldName.substring(0, 1).toUpperCase() +
+                                      fieldName.substring(1) + "()";
+
+            final Optional<BiFunction<Integer, String, String>> primitiveToFunction = Optional.ofNullable(
+                    PRIMITIVE_TYPE_TO_FUNCTION.get(fieldType));
+            if (primitiveToFunction.isPresent()) {
+                final String primitiveVariableConversation = primitiveToFunction.get().apply(offset, getterName);
+                sb
+                        .append(primitiveVariableConversation)
+                        .append('\n');
+
+                offset += PRIMITIVE_TYPE_TO_SIZE.get(fieldType); // doesn't recheck the type because it is already checked above
+            } else if (fieldType.equals("java.lang.String")) {
+                sb
+                        .append(STRING_CONVERTER.apply(getterName).formatted(getterName))
+                        // increase offset by the size of the byte array (already calculated)
+                        .append("\t\toffset += %s;%n".formatted(stringFieldFirstLevelGetterToSize.get(getterName)))
+                        .append('\n');
+            }
+        }
+    }
+
+    private static void processTail(final StringBuilder sb) {
+        sb
+                .append("\t\treturn result;\n\t")
+                .append(END_OF_ELEMENT_TYPE) // end of serialize method
+                .append('\n')
+                .append(END_OF_ELEMENT_TYPE); // end of class
+    }
+
+    private static void addFloatAndDoubleFieldsForCachingIfNecessary(final StringBuilder sb, final List<? extends Element> modelFields) {
+        final boolean hasFloatField = modelFields.stream()
+                .anyMatch(e -> FLOAT.equals(e.asType().toString()));
+
+        if (hasFloatField) {
+            sb
+                    .append(FLOAT_BITS_VARIABLE_DECLARATION)
+                    .append('\n');
+        }
+
+        final boolean hasDoubleField = modelFields.stream()
+                .anyMatch(e -> DOUBLE.equals(e.asType().toString()));
+
+        if (hasDoubleField) {
+            sb
+                    .append(DOUBLE_BITS_VARIABLE_DECLARATION)
+                    .append('\n');
+        }
+    }
+
+    private static void calculateFinalByteArraySize(final StringBuilder sb, final List<? extends Element> modelFields, final Map<String, String> stringFieldFirstLevelGetterToSize) {
+        final Set<String> stringFieldsFirstLevel = new HashSet<>();
+        int modelSize = 0;
+        for (final Element field : modelFields) {
+            final String fieldType = field.asType().toString();
+            final Optional<Integer> optionalPrimitiveSize = Optional.ofNullable(PRIMITIVE_TYPE_TO_SIZE.get(fieldType));
+            if (optionalPrimitiveSize.isPresent()) {
+                modelSize += optionalPrimitiveSize.get();
+            } else if (fieldType.equals("java.lang.String")) {
+                stringFieldsFirstLevel.add(field.getSimpleName().toString());
+            }
+        }
+
+        boolean hasDynamicSize = !stringFieldsFirstLevel.isEmpty();
+        if (hasDynamicSize) {
+            sb
+                    .append("\t\tint modelDynamicSize = 0;\n");
+            final List<String> stringFieldsFirstLayerGetters = stringFieldsFirstLevel.stream()
+                    .map(s -> "get" + s.substring(0, 1).toUpperCase() + s.substring(1) + "()")
+                    .toList();
+            for (int i = 0; i < stringFieldsFirstLayerGetters.size(); ++i) {
+                // create unique variable name containing the byte array size
+                final String byteArraySize = "byteArraySize" + i;
+                stringFieldFirstLevelGetterToSize.put(stringFieldsFirstLayerGetters.get(i), byteArraySize);
+                sb
+                        .append("\t\tint %s = 1 + com.hadj4r.serializer.util.UTF8Utils.utf8StringByteArrayLength(model.%s);%n"
+                                .formatted(byteArraySize, stringFieldsFirstLayerGetters.get(i)))
+                        .append("\t\tmodelDynamicSize += %s;%n"
+                                .formatted(byteArraySize));
+            }
+        }
+
+        sb
+                .append("\t\tbyte[] result = new byte[")
+                .append(modelSize)
+                .append(" + ")
+                .append("modelDynamicSize")
+                .append("];\n\n");
+    }
+
+    private static List<? extends Element> getModelFields(final Element modelClass) {
+        return modelClass.getEnclosedElements().stream()
+                .filter(e -> FIELD.equals(e.getKind()))
+                .toList();
+    }
+
+    private static Element getModelClass(final RoundEnvironment roundEnv, final String modelFullName) {
+        return roundEnv.getRootElements().stream()
+                .filter(e -> modelFullName.equals(e.toString())).findFirst()
+                .orElseThrow(() -> new RuntimeException("Could not find model class"));
+    }
+
+    private static void processHeader(final String className, final String packageName, final String serializerName, final String modelFullName, final StringBuilder sb) {
+        sb
+                .append(BUILDER_CLASS_SIGNATURE.formatted(packageName, serializerName, className))
+                .append(SERIALIZE_METHOD_SIGNATURE.formatted(modelFullName));
+    }
+
+    private PrintWriter getPrintWriter(final String serializerFullName) throws IOException {
+        return new PrintWriter(processingEnv.getFiler().createSourceFile(serializerFullName).openWriter());
     }
 }
 
