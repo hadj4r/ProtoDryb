@@ -7,14 +7,15 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.Setter;
 
 @Convertable
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @Getter
-@ToString
+@Setter
+@EqualsAndHashCode
 public class Point {
     @PrimitiveField(order = 1)
     private int x;

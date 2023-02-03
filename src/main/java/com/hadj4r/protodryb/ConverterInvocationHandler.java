@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 public class ConverterInvocationHandler implements InvocationHandler {
     private final Class<?> modelClass;
     private final Set<Field> fields;
+
     @Override
     public Object invoke(final Object o, final Method method, final Object[] objects) throws Throwable {
         // if method is encode then return encode method
@@ -20,7 +21,7 @@ public class ConverterInvocationHandler implements InvocationHandler {
 
         // if method is decode then return decode method
         if (method.getName().equals("decode")) {
-            return decode((byte[])objects[0]);
+            return decode((byte[]) objects[0]);
         }
 
         throw new IllegalArgumentException("Method " + method.getName() + " is not declared in ByteConverter");
@@ -71,7 +72,7 @@ public class ConverterInvocationHandler implements InvocationHandler {
     }
 
     private byte[] intToBytes(final int value) {
-        return new byte[] {
+        return new byte[]{
                 (byte) (value >>> 24),
                 (byte) (value >>> 16),
                 (byte) (value >>> 8),
