@@ -1,4 +1,4 @@
-package com.hadj4r.becnhmark;
+package com.hadj4r.benchmark;
 
 import com.dslplatform.json.DslJson;
 import com.dslplatform.json.JsonWriter;
@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.flatbuffers.FlatBufferBuilder;
 import com.hadj4r.model.ImmutableModel;
 import com.hadj4r.model.ImmutableModelSerializer;
+import com.hadj4r.model.flatbuffers.FlatbuffersModel;
 import com.hadj4r.model.proto.ProtoModelOuterClass.ProtoModel;
 import java.io.IOException;
 import org.openjdk.jmh.annotations.Benchmark;
