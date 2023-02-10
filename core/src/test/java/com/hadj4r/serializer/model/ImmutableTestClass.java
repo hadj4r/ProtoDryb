@@ -20,13 +20,15 @@ public class ImmutableTestClass {
     private final long[] longArrayVar;
     private final float[] floatArrayVar;
     private final double[] doubleArrayVar;
+    private final Child childVar;
+    private final Child2 child2Var;
 
     public ImmutableTestClass(final boolean booleanVar, final char charVar, final byte byteVar, final short shortVar,
                               final int intVar, final long longVar, final float floatVar, final double doubleVar,
                               final String stringVar, final String stringVar2, final boolean[] booleanArrayVar,
                               final char[] charArrayVar, final byte[] byteArrayVar, final short[] shortArrayVar,
                               final int[] intArrayVar, final long[] longArrayVar, final float[] floatArrayVar,
-                              final double[] doubleArrayVar) {
+                              final double[] doubleArrayVar, final Child childVar, final Child2 child2Var) {
         this.booleanVar = booleanVar;
         this.charVar = charVar;
         this.byteVar = byteVar;
@@ -45,6 +47,8 @@ public class ImmutableTestClass {
         this.longArrayVar = longArrayVar;
         this.floatArrayVar = floatArrayVar;
         this.doubleArrayVar = doubleArrayVar;
+        this.childVar = childVar;
+        this.child2Var = child2Var;
     }
 
     public boolean isBooleanVar() {
@@ -119,6 +123,14 @@ public class ImmutableTestClass {
         return doubleArrayVar;
     }
 
+    public Child getChildVar() {
+        return childVar;
+    }
+
+    public Child2 getChild2Var() {
+        return child2Var;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -142,6 +154,11 @@ public class ImmutableTestClass {
         private long[] longArrayVar;
         private float[] floatArrayVar;
         private double[] doubleArrayVar;
+        private Child childVar;
+        private Child2 child2Var;
+
+        public Builder() {
+        }
 
         public Builder setBooleanVar(boolean booleanVar) {
             this.booleanVar = booleanVar;
@@ -233,10 +250,20 @@ public class ImmutableTestClass {
             return this;
         }
 
+        public Builder setChildVar(Child childVar) {
+            this.childVar = childVar;
+            return this;
+        }
+
+        public Builder setChild2Var(Child2 child2Var) {
+            this.child2Var = child2Var;
+            return this;
+        }
+
         public ImmutableTestClass build() {
             return new ImmutableTestClass(booleanVar, charVar, byteVar, shortVar, intVar, longVar, floatVar, doubleVar,
                     stringVar, stringVar2, booleanArrayVar, charArrayVar, byteArrayVar, shortArrayVar, intArrayVar,
-                    longArrayVar, floatArrayVar, doubleArrayVar);
+                    longArrayVar, floatArrayVar, doubleArrayVar, childVar, child2Var);
         }
     }
 }

@@ -35,7 +35,8 @@ public interface MyPojoSerializer extends SerializerService<MyPojo> {
 list of things to do with mark of undone
 - [x] add support for arrays
 - [ ] add support for collections
-- [ ] add support for nested objects
+- [x] add support for nested objects
 - [ ] add bit packing for primitive types (compact varints)
 - [ ] add deserialization
 - [ ] add non required fields
+- [ ] add lombok support

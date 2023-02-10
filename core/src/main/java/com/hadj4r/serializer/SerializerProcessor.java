@@ -1,26 +1,36 @@
 package com.hadj4r.serializer;
 
 import com.google.auto.service.AutoService;
+import com.hadj4r.serializer.util.Node;
+import com.hadj4r.serializer.util.Pair;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
+import java.util.Stack;
+import java.util.TreeMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import static javax.lang.model.SourceVersion.RELEASE_17;
-import static javax.lang.model.element.ElementKind.FIELD;
 
 @AutoService(Processor.class)
 @SupportedSourceVersion(RELEASE_17)
@@ -52,6 +62,7 @@ public class SerializerProcessor extends AbstractProcessor {
     private static final String FLOAT = "float";
     private static final String DOUBLE = "double";
     private static final String ARRAY = "[]";
+    private static final String ARRAY_LENGTH = ".length";
     private static final String BOOLEAN_ARRAY = BOOLEAN + ARRAY;
     private static final String BYTE_ARRAY = BYTE + ARRAY;
     private static final String CHAR_ARRAY = CHAR + ARRAY;
@@ -70,6 +81,17 @@ public class SerializerProcessor extends AbstractProcessor {
             LONG_ARRAY,
             FLOAT_ARRAY,
             DOUBLE_ARRAY
+    );
+
+    private static final Set<String> PRIMITIVE_TYPES = Set.of(
+            BOOLEAN,
+            BYTE,
+            CHAR,
+            SHORT,
+            INT,
+            LONG,
+            FLOAT,
+            DOUBLE
     );
 
     private static final Map<String, Integer> PRIMITIVE_TYPE_TO_SIZE = Map.of(
@@ -94,97 +116,83 @@ public class SerializerProcessor extends AbstractProcessor {
             DOUBLE_ARRAY, 8
     );
 
-    private static final Map<Integer, String> SHIFT_TO_HEX_COVER = Map.of(
-            0, "0xFF",
-            1, "0x7F",
-            2, "0x3F",
-            3, "0x1F",
-            4, "0x0F",
-            5, "0x07",
-            6, "0x03",
-            7, "0x01"
-    );
-
-    private static final BiFunction<Integer, String, String> BOOLEAN_CONVERTER = """
-            \t\tresult[%s] = (byte) (model.%s ? 1 : 0);
+    private static final Function<String, String> BOOLEAN_CONVERTER = """
+            \t\tresult[offset] = (byte) (%s ? 1 : 0);
             \t\toffset += 1;
             """::formatted;
 
-    private static final BiFunction<Integer, String, String> CHAR_CONVERTER = (offset, getterName) -> """
-            \t\tresult[%s] = (byte) (model.%s >>> 8);
-            \t\tresult[%s] = (byte) model.%s;
+    private static final Function<String, String> CHAR_CONVERTER = getterName -> """
+            \t\tresult[offset] = (byte) (%s >>> 8);
+            \t\tresult[offset + 1] = (byte) %s;
             \t\toffset += 2;
-            """.formatted(offset, getterName, offset + 1, getterName);
+            """.formatted(getterName, getterName);
 
-    private static final BiFunction<Integer, String, String> BYTE_CONVERTER = """
-            \t\tresult[%s] = model.%s;
+    private static final Function<String, String> BYTE_CONVERTER = """
+            \t\tresult[offset] = %s;
             \t\toffset += 1;
             """::formatted;
 
-    private static final BiFunction<Integer, String, String> SHORT_CONVERTER = (offset, getterName) -> """
-            \t\tresult[%s] = (byte) (model.%s >>> 8);
-            \t\tresult[%s] = (byte) model.%s;
+    private static final Function<String, String> SHORT_CONVERTER = getterName -> """
+            \t\tresult[offset] = (byte) (%s >>> 8);
+            \t\tresult[offset + 1] = (byte) %s;
             \t\toffset += 2;
-            """.formatted(offset, getterName, offset + 1, getterName);
+            """.formatted(getterName, getterName);
 
-    private static final BiFunction<Integer, String, String> INT_CONVERTER = (offset, getterName) -> """
-            \t\tresult[%s] = (byte) (model.%s >>> 24);
-            \t\tresult[%s] = (byte) (model.%s >>> 16);
-            \t\tresult[%s] = (byte) (model.%s >>> 8);
-            \t\tresult[%s] = (byte)  model.%s;
+    private static final Function<String, String> INT_CONVERTER = getterName -> """
+            \t\tresult[offset] = (byte) (%s >>> 24);
+            \t\tresult[offset + 1] = (byte) (%s >>> 16);
+            \t\tresult[offset + 2] = (byte) (%s >>> 8);
+            \t\tresult[offset + 3] = (byte)  %s;
             \t\toffset += 4;
-            """.formatted(offset, getterName, offset + 1, getterName, offset + 2, getterName, offset + 3,
-            getterName);
+            """.formatted(getterName, getterName, getterName, getterName);
 
-    private static final BiFunction<Integer, String, String> LONG_CONVERTER = (offset, getterName) -> """
-            \t\tresult[%s] = (byte) (model.%s >>> 56);
-            \t\tresult[%s] = (byte) (model.%s >>> 48);
-            \t\tresult[%s] = (byte) (model.%s >>> 40);
-            \t\tresult[%s] = (byte) (model.%s >>> 32);
-            \t\tresult[%s] = (byte) (model.%s >>> 24);
-            \t\tresult[%s] = (byte) (model.%s >>> 16);
-            \t\tresult[%s] = (byte) (model.%s >>> 8);
-            \t\tresult[%s] = (byte)  model.%s;
+    private static final Function<String, String> LONG_CONVERTER = getterName -> """
+            \t\tresult[offset] = (byte) (%s >>> 56);
+            \t\tresult[offset + 1] = (byte) (%s >>> 48);
+            \t\tresult[offset + 2] = (byte) (%s >>> 40);
+            \t\tresult[offset + 3] = (byte) (%s >>> 32);
+            \t\tresult[offset + 4] = (byte) (%s >>> 24);
+            \t\tresult[offset + 5] = (byte) (%s >>> 16);
+            \t\tresult[offset + 6] = (byte) (%s >>> 8);
+            \t\tresult[offset + 7] = (byte)  %s;
             \t\toffset += 8;
-            """.formatted(offset, getterName, offset + 1, getterName, offset + 2, getterName, offset + 3,
-            getterName, offset + 4, getterName, offset + 5, getterName, offset + 6, getterName, offset + 7, getterName);
+            """.formatted(getterName, getterName, getterName, getterName, getterName, getterName, getterName, getterName);
 
-    private static final BiFunction<Integer, String, String> FLOAT_CONVERTER = (offset, getterName) -> """
-            \t\tfloatBits = Float.floatToIntBits(model.%s);
-            \t\tresult[%s] = (byte) (floatBits >>> 24);
-            \t\tresult[%s] = (byte) (floatBits >>> 16);
-            \t\tresult[%s] = (byte) (floatBits >>> 8);
-            \t\tresult[%s] = (byte)  floatBits;
+    private static final Function<String, String> FLOAT_CONVERTER = """
+            \t\tfloatBits = Float.floatToIntBits(%s);
+            \t\tresult[offset] = (byte) (floatBits >>> 24);
+            \t\tresult[offset + 1] = (byte) (floatBits >>> 16);
+            \t\tresult[offset + 2] = (byte) (floatBits >>> 8);
+            \t\tresult[offset + 3] = (byte)  floatBits;
             \t\toffset += 4;
-            """.formatted(getterName, offset, offset + 1, offset + 2, offset + 3);
+            """::formatted;
 
-    private static final BiFunction<Integer, String, String> DOUBLE_CONVERTER = (offset, getterName) -> """
-            \t\tdoubleBits = Double.doubleToLongBits(model.%s);
-            \t\tresult[%s] = (byte) (doubleBits >>> 56);
-            \t\tresult[%s] = (byte) (doubleBits >>> 48);
-            \t\tresult[%s] = (byte) (doubleBits >>> 40);
-            \t\tresult[%s] = (byte) (doubleBits >>> 32);
-            \t\tresult[%s] = (byte) (doubleBits >>> 24);
-            \t\tresult[%s] = (byte) (doubleBits >>> 16);
-            \t\tresult[%s] = (byte) (doubleBits >>> 8);
-            \t\tresult[%s] = (byte)  doubleBits;
+    private static final Function<String, String> DOUBLE_CONVERTER = """
+            \t\tdoubleBits = Double.doubleToLongBits(%s);
+            \t\tresult[offset] = (byte) (doubleBits >>> 56);
+            \t\tresult[offset + 1] = (byte) (doubleBits >>> 48);
+            \t\tresult[offset + 2] = (byte) (doubleBits >>> 40);
+            \t\tresult[offset + 3] = (byte) (doubleBits >>> 32);
+            \t\tresult[offset + 4] = (byte) (doubleBits >>> 24);
+            \t\tresult[offset + 5] = (byte) (doubleBits >>> 16);
+            \t\tresult[offset + 6] = (byte) (doubleBits >>> 8);
+            \t\tresult[offset + 7] = (byte)  doubleBits;
             \t\toffset += 8;
-            """.formatted(getterName, offset, offset + 1, offset + 2, offset + 3, offset + 4, offset + 5,
-            offset + 6, offset + 7);
+            """::formatted;
 
     private static final Function<String, String> STRING_CONVERTER = """
-            \t\tcom.hadj4r.serializer.util.UTF8Utils.stringToUTF8BytesArray(model.%s, result, offset);
+            \t\tcom.hadj4r.serializer.util.UTF8Utils.stringToUTF8BytesArray(%s, result, offset);
             """::formatted;
-    private static final BiFunction<Integer, String, String> BOOLEAN_ARRAY_CONVERTER = booleanArrayConverter();
-    private static final BiFunction<Integer, String, String> CHAR_ARRAY_CONVERTER = charArrayConverter();
-    private static final BiFunction<Integer, String, String> BYTE_ARRAY_CONVERTER = byteArrayConverter();
-    private static final BiFunction<Integer, String, String> SHORT_ARRAY_CONVERTER = shortArrayConverter();
-    private static final BiFunction<Integer, String, String> INT_ARRAY_CONVERTER = intArrayConverter();
-    private static final BiFunction<Integer, String, String> LONG_ARRAY_CONVERTER = longArrayConverter();
-    private static final BiFunction<Integer, String, String> FLOAT_ARRAY_CONVERTER = floatArrayConverter();
-    private static final BiFunction<Integer, String, String> DOUBLE_ARRAY_CONVERTER = doubleArrayConverter();
+    private static final Function<String, String> BOOLEAN_ARRAY_CONVERTER = booleanArrayConverter();
+    private static final Function<String, String> CHAR_ARRAY_CONVERTER = charArrayConverter();
+    private static final Function<String, String> BYTE_ARRAY_CONVERTER = byteArrayConverter();
+    private static final Function<String, String> SHORT_ARRAY_CONVERTER = shortArrayConverter();
+    private static final Function<String, String> INT_ARRAY_CONVERTER = intArrayConverter();
+    private static final Function<String, String> LONG_ARRAY_CONVERTER = longArrayConverter();
+    private static final Function<String, String> FLOAT_ARRAY_CONVERTER = floatArrayConverter();
+    private static final Function<String, String> DOUBLE_ARRAY_CONVERTER = doubleArrayConverter();
 
-    private static final Map<String, BiFunction<Integer, String, String>> PRIMITIVE_TYPE_TO_CONVERTER = Map.of(
+    private static final Map<String, Function<String, String>> PRIMITIVE_TYPE_TO_CONVERTER = Map.of(
             BOOLEAN, BOOLEAN_CONVERTER,
             CHAR, CHAR_CONVERTER,
             BYTE, BYTE_CONVERTER,
@@ -195,7 +203,7 @@ public class SerializerProcessor extends AbstractProcessor {
             DOUBLE, DOUBLE_CONVERTER
     );
 
-    private static final Map<String, BiFunction<Integer, String, String>> PRIMITIVE_ARRAY_TYPE_TO_CONVERTER = Map.of(
+    private static final Map<String, Function<String, String>> PRIMITIVE_ARRAY_TYPE_TO_CONVERTER = Map.of(
             BOOLEAN_ARRAY, BOOLEAN_ARRAY_CONVERTER,
             CHAR_ARRAY, CHAR_ARRAY_CONVERTER,
             BYTE_ARRAY, BYTE_ARRAY_CONVERTER,
@@ -205,6 +213,11 @@ public class SerializerProcessor extends AbstractProcessor {
             FLOAT_ARRAY, FLOAT_ARRAY_CONVERTER,
             DOUBLE_ARRAY, DOUBLE_ARRAY_CONVERTER
     );
+
+    private static final BiFunction<Integer, Byte, String> TYPE_ID = """
+            \t\tresult[%s] = %s;
+            \t\toffset += 1;
+            """::formatted;
 
     @Override
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
@@ -226,18 +239,25 @@ public class SerializerProcessor extends AbstractProcessor {
         final DeclaredType declaredType = (DeclaredType) typeElement.getInterfaces().get(0);
         final String modelFullName = declaredType.getTypeArguments().get(0).toString();
 
+        final Element rootModel = roundEnv.getRootElements().stream()
+                .filter(e -> modelFullName.equals(e.toString()))
+                .findAny()
+                .orElseThrow(() -> new RuntimeException("Cannot find the model class " + modelFullName));
+
+        final Node root = createTreeOfFieldNodes(rootModel, rootModel, null, roundEnv);
+        root.setFieldName("model");
+        final Map<String, Byte> typesToIds = calculateTypeIds(root);
+
         final StringBuilder sb = new StringBuilder();
 
         try (final PrintWriter writer = getPrintWriter(serializerFullName)) {
             processHeader(className, packageName, serializerName, modelFullName, sb);
 
-            final Element modelClass = getModelClass(roundEnv, modelFullName);
-            final List<? extends Element> modelFields = getModelFields(modelClass);
-            final Map<String, String> stringFieldFirstLevelGetterToSize = new HashMap<>();
+            final Map<String, String> stringGetterToSize = new HashMap<>();
 
-            calculateFinalByteArraySize(sb, modelFields, stringFieldFirstLevelGetterToSize);
-            addFloatAndDoubleFieldsForCachingIfNecessary(sb, modelFields);
-            processFieldsSerialization(sb, modelFields, stringFieldFirstLevelGetterToSize);
+            calculateFinalByteArraySize(sb, root, stringGetterToSize);
+            addFloatAndDoubleFieldsForCachingIfNecessary(sb, root);
+            processFieldsSerialization(sb, root, typesToIds, stringGetterToSize);
             processTail(sb);
 
             writer.write(sb.toString());
@@ -246,42 +266,111 @@ public class SerializerProcessor extends AbstractProcessor {
         }
     }
 
-    private static void processFieldsSerialization(final StringBuilder sb, final List<? extends Element> modelFields,
-                                                   final Map<String, String> stringFieldFirstLevelGetterToSize) {
+    private Map<String, Byte> calculateTypeIds(final Node root) {
+        final Map<Node, Byte> typesToIds = new TreeMap<>(Comparator.comparing(Node::getType));
+        byte id = 0;
+
+        final Queue<Node> queue = new LinkedList<>();
+        queue.add(root);
+
+        while (!queue.isEmpty()) {
+            final Node node = queue.poll();
+            if (!typesToIds.containsKey(node)) {
+                typesToIds.put(node, ++id);
+            }
+
+            node.getChildren().stream()
+                    .filter(ch -> isCustomType(ch.getType()))
+                    .forEach(queue::add);
+        }
+
+        return typesToIds.entrySet().stream()
+                .collect(Collectors.toMap(e -> e.getKey().getType(), Map.Entry::getValue));
+    }
+
+    private Node createTreeOfFieldNodes(final Element classElement, final Element fieldElement, final Node parent,
+                                        final RoundEnvironment roundEnv) {
+        if (classElement == null) {
+            return new Node(fieldElement.asType(), fieldElement, parent);
+        }
+
+        final Node n = new Node(classElement.asType(), fieldElement, parent);
+        classElement.getEnclosedElements().stream()
+                .filter(e -> e.getKind() == ElementKind.FIELD)
+                .map(e -> new Pair<>(getElementOrNull(roundEnv, e), e)) // element & field name
+                .map(e -> createTreeOfFieldNodes(e.getFirst(), e.getSecond(), n, roundEnv))
+                .forEach(n::addChild);
+
+        return n;
+    }
+
+    private static Element getElementOrNull(final RoundEnvironment roundEnv, final Element e) {
+        return roundEnv.getRootElements().stream()
+                .filter(r -> r.toString().equals(e.asType().toString()))
+                .findAny()
+                .orElse(null);
+    }
+
+    private static boolean isCustomType(final String type) {
+        return !isPrimitive(type) && !isPrimitiveArray(type) && !isString(type);
+    }
+
+    private static boolean isPrimitive(final String type) {
+        return PRIMITIVE_TYPES.contains(type);
+    }
+
+    private static boolean isPrimitiveArray(final String type) {
+        return PRIMITIVE_ARRAY_TYPES.contains(type);
+    }
+
+    private static boolean isString(final String type) {
+        return String.class.getName().equals(type);
+    }
+
+    private static void processFieldsSerialization(final StringBuilder sb, final Node root,
+                                                   final Map<String, Byte> typesToIds, final Map<String, String> stringFieldGetterToSize) {
         sb.append("\t\tint offset = 0;\n\n");
         int offset = 0;
-        for (final Element field : modelFields) {
-            final String fieldType = field.asType().toString();
-            final String fieldName = field.getSimpleName().toString();
-            final String getterName = (BOOLEAN.equals(fieldType) ? "is" : "get") +
-                                      fieldName.substring(0, 1).toUpperCase() +
-                                      fieldName.substring(1) + "()";
+        final Stack<Node> stack = new Stack<>();
+        stack.add(root);
 
-            final Optional<BiFunction<Integer, String, String>> primitiveToFunction = Optional.ofNullable(
-                    PRIMITIVE_TYPE_TO_CONVERTER.get(fieldType));
-            if (primitiveToFunction.isPresent()) {
-                final String primitiveVariableConversation = primitiveToFunction.get().apply(offset, getterName);
+        while (!stack.isEmpty()) {
+            final Node node = stack.pop();
+            final String fieldType = node.getType();
+            final String getterName = node.getFieldNameAsGetter();
+
+            if (isCustomType(fieldType)) {
+                final Byte id = typesToIds.get(fieldType);
+                sb
+                        .append("\t\t// adding type for type")
+                        .append(fieldType)
+                        .append('\n')
+                        .append(TYPE_ID.apply(offset, id))
+                        .append('\n');
+                stack.addAll(node.getChildren());
+                offset += 1;
+            } else if (isPrimitive(fieldType)) {
+                final Function<String, String> primitiveToFunction = PRIMITIVE_TYPE_TO_CONVERTER.get(fieldType);
+                final String primitiveVariableConversation = primitiveToFunction.apply(getterName);
                 sb
                         .append(primitiveVariableConversation)
                         .append('\n');
 
-                offset += PRIMITIVE_TYPE_TO_SIZE.get(fieldType); // doesn't recheck the type because it is already checked above
-            } else if (fieldType.equals(String.class.getName())) {
+                offset += PRIMITIVE_TYPE_TO_SIZE.get(fieldType);// doesn't recheck the type because it is already checked above
+            } else if (isString(fieldType)) {
                 sb
                         .append(STRING_CONVERTER.apply(getterName).formatted(getterName))
                         // increase offset by the size of the byte array (already calculated)
-                        .append("\t\toffset += %s;%n".formatted(stringFieldFirstLevelGetterToSize.get(getterName)))
+                        .append("\t\toffset += %s;%n".formatted(stringFieldGetterToSize.get(getterName)))
                         .append('\n');
-            } else if (PRIMITIVE_ARRAY_TYPES.contains(fieldType)) {
+            } else if (isPrimitiveArray(fieldType)) {
                 sb
-                        .append("\t\tresult[offset++] = (byte) model.%s.length;%n".formatted(getterName))
-                        .append(PRIMITIVE_ARRAY_TYPE_TO_CONVERTER.get(fieldType).apply(offset, getterName))
+                        .append("\t\tresult[offset++] = (byte) %s.length;%n".formatted(getterName))
+                        .append(PRIMITIVE_ARRAY_TYPE_TO_CONVERTER.get(fieldType).apply(getterName))
                         // increase offset by the size of the byte array (already calculated)
-                        .append("\t\toffset += %s * model.%s;%n"
-                                .formatted(PRIMITIVE_ARRAY_TYPE_TO_SIZE.get(fieldType), getterName + ".length"))
+                        .append("\t\toffset += %s * %s;%n"
+                                .formatted(PRIMITIVE_ARRAY_TYPE_TO_SIZE.get(fieldType), getterName + ARRAY_LENGTH))
                         .append('\n');
-            } else {
-                throw new UnsupportedOperationException("Unsupported type: " + fieldType);
             }
         }
     }
@@ -295,69 +384,88 @@ public class SerializerProcessor extends AbstractProcessor {
     }
 
     private static void addFloatAndDoubleFieldsForCachingIfNecessary(final StringBuilder sb,
-                                                                     final List<? extends Element> modelFields) {
-        final boolean hasFloatField = modelFields.stream()
-                .anyMatch(e -> FLOAT.equals(e.asType().toString()) || FLOAT_ARRAY.equals(e.asType().toString()));
-
-        if (hasFloatField) {
+                                                                     final Node root) {
+        if (hasType(root, FLOAT, FLOAT_ARRAY)) {
             sb
                     .append(FLOAT_BITS_VARIABLE_DECLARATION)
                     .append('\n');
         }
 
-        final boolean hasDoubleField = modelFields.stream()
-                .anyMatch(e -> DOUBLE.equals(e.asType().toString()) || DOUBLE_ARRAY.equals(e.asType().toString()));
-
-        if (hasDoubleField) {
+        if (hasType(root, DOUBLE, DOUBLE_ARRAY)) {
             sb
                     .append(DOUBLE_BITS_VARIABLE_DECLARATION)
                     .append('\n');
         }
     }
 
-    private static void calculateFinalByteArraySize(final StringBuilder sb, final List<? extends Element> modelFields,
-                                                    final Map<String, String> stringFieldFirstLevelGetterToSize) {
+    private static boolean hasType(final Node root, final String ... types) {
+        final Predicate<String> hasAnyType = Arrays.stream(types)
+                .map(type -> (Predicate<String>) type::equals)
+                .reduce(Predicate::or)
+                .orElse(e -> false);
+        final Queue<Node> queue = new LinkedList<>();
+        queue.add(root);
+
+        while (!queue.isEmpty()) {
+            final Node node = queue.poll();
+            if (hasAnyType.test(node.getType())) {
+                return true;
+            }
+
+            queue.addAll(node.getChildren());
+        }
+
+        return false;
+    }
+
+    private static void calculateFinalByteArraySize(final StringBuilder sb, final Node root,
+                                                    final Map<String, String> stringGettersToSize) {
         // using list to preserve the order of the fields
-        final List<String> stringFieldsFirstLevel = new ArrayList<>();
-        final List<String> primitiveArrayFieldsFirstLevel = new ArrayList<>();
+        final List<String> stringFields = new ArrayList<>();
+        final List<String> primitiveArrays = new ArrayList<>();
+        final Map<String, String> primitiveArrayFieldsToType = new HashMap<>();
         int modelSize = 0;
-        final Map<String, String> primitiveArrayFieldToTypeFirstLevel = new HashMap<>();
-        for (final Element field : modelFields) {
-            final String fieldType = field.asType().toString();
-            final Optional<Integer> optionalPrimitiveSize = Optional.ofNullable(PRIMITIVE_TYPE_TO_SIZE.get(fieldType));
-            if (optionalPrimitiveSize.isPresent()) {
-                modelSize += optionalPrimitiveSize.get();
-            } else if (fieldType.equals(String.class.getName())) {
-                stringFieldsFirstLevel.add(field.getSimpleName().toString());
-            } else if (PRIMITIVE_ARRAY_TYPES.contains(fieldType)) {
-                final String fieldName = field.getSimpleName().toString();
-                primitiveArrayFieldsFirstLevel.add(fieldName);
-                primitiveArrayFieldToTypeFirstLevel.put(fieldName, fieldType);
+
+        final Deque<Node> stack = new LinkedList<>();
+        stack.push(root);
+
+        while (!stack.isEmpty()) {
+            final Node node = stack.pop();
+            final String type = node.getType();
+            final String fieldGetter = node.getFieldNameAsGetter();
+
+            if (isCustomType(type)) {
+                modelSize += 1; // 1 byte to identify the type
+                node.getChildren().forEach(stack::push);
+            } else if (isPrimitive(type)) {
+                modelSize += PRIMITIVE_TYPE_TO_SIZE.get(type);
+            } else if (isString(type)) {
+                stringFields.add(fieldGetter);
+            } else if (isPrimitiveArray(type)) {
+                primitiveArrays.add(fieldGetter);
+                primitiveArrayFieldsToType.put(fieldGetter, type);
             }
         }
 
-        boolean hasDynamicSize = !stringFieldsFirstLevel.isEmpty() || !primitiveArrayFieldsFirstLevel.isEmpty();
+        boolean hasDynamicSize = !stringFields.isEmpty() || !primitiveArrays.isEmpty();
         if (hasDynamicSize) {
             sb.append("\t\tint modelDynamicSize = 0;\n");
             int i = 0;
-            for (final String s : stringFieldsFirstLevel) {
-                final String stringGetter = "get" + s.substring(0, 1).toUpperCase() + s.substring(1) + "()";
+            for (final String stringGetter : stringFields) {
                 final String byteArraySize = getByteArrSizeVariableName(i);
-                stringFieldFirstLevelGetterToSize.put(stringGetter, byteArraySize);
+                stringGettersToSize.put(stringGetter, byteArraySize);
                 sb
-                        .append("\t\tint %s = 1 + com.hadj4r.serializer.util.UTF8Utils.utf8StringByteArrayLength(model.%s);%n"
+                        .append("\t\tint %s = 1 + com.hadj4r.serializer.util.UTF8Utils.utf8StringByteArrayLength(%s);%n"
                                 .formatted(byteArraySize, stringGetter))
                         .append("\t\tmodelDynamicSize += %s;%n"
                                 .formatted(byteArraySize));
                 ++i;
             }
-            for (String arr : primitiveArrayFieldsFirstLevel) {
-                final String arrayGetter = "get" + arr.substring(0, 1).toUpperCase() + arr.substring(1) + "()";
-                final String arraySize = arrayGetter + ".length";
+            for (String arrayGetter : primitiveArrays) {
+                final String arraySize = arrayGetter + ARRAY_LENGTH;
                 sb
-                        .append("\t\tmodelDynamicSize += 1 + %s * model.%s;%n"
-                                .formatted(PRIMITIVE_ARRAY_TYPE_TO_SIZE
-                                        .get(primitiveArrayFieldToTypeFirstLevel.get(arr)), arraySize));
+                        .append("\t\tmodelDynamicSize += 1 + %s * %s;%n"
+                                .formatted(PRIMITIVE_ARRAY_TYPE_TO_SIZE.get(primitiveArrayFieldsToType.get(arrayGetter)), arraySize));
                 ++i;
             }
         }
@@ -374,18 +482,6 @@ public class SerializerProcessor extends AbstractProcessor {
         return "byteArrSize" + i;
     }
 
-    private static List<? extends Element> getModelFields(final Element modelClass) {
-        return modelClass.getEnclosedElements().stream()
-                .filter(e -> FIELD.equals(e.getKind()))
-                .toList();
-    }
-
-    private static Element getModelClass(final RoundEnvironment roundEnv, final String modelFullName) {
-        return roundEnv.getRootElements().stream()
-                .filter(e -> modelFullName.equals(e.toString())).findFirst()
-                .orElseThrow(() -> new RuntimeException("Could not find model class"));
-    }
-
     private static void processHeader(final String className, final String packageName, final String serializerName,
                                       final String modelFullName, final StringBuilder sb) {
         sb
@@ -397,91 +493,91 @@ public class SerializerProcessor extends AbstractProcessor {
         return new PrintWriter(processingEnv.getFiler().createSourceFile(serializerFullName).openWriter());
     }
 
-    private static BiFunction<Integer, String, String> booleanArrayConverter() {
-        return (offset, getterName) -> {
-            final String arraySize = getterName + ".length";
+    private static Function<String, String> booleanArrayConverter() {
+        return getterName -> {
+            final String arraySize = getterName + ARRAY_LENGTH;
             return """
-                    \t\tfor (int i = 0; i < model.%s; i++) {
-                    \t\t\tresult[offset + i] = (byte) (model.%s[i] ? 1 : 0);
+                    \t\tfor (int i = 0; i < %s; i++) {
+                    \t\t\tresult[offset + i] = (byte) (%s[i] ? 1 : 0);
                     \t\t}
                     """.formatted(arraySize, getterName);
         };
     }
 
-    private static BiFunction<Integer, String, String> byteArrayConverter() {
-        return (offset, getterName) -> {
-            final String arraySize = getterName + ".length";
+    private static Function<String, String> byteArrayConverter() {
+        return getterName -> {
+            final String arraySize = getterName + ARRAY_LENGTH;
             return """
-                    \t\tfor (int i = 0; i < model.%s; i++) {
-                    \t\t\tresult[offset + i] = model.%s[i];
+                    \t\tfor (int i = 0; i < %s; i++) {
+                    \t\t\tresult[offset + i] = %s[i];
                     \t\t}
                     """.formatted(arraySize, getterName);
         };
     }
 
-    private static BiFunction<Integer, String, String> charArrayConverter() {
-        return (offset, getterName) -> {
-            final String arraySize = getterName + ".length";
+    private static Function<String, String> charArrayConverter() {
+        return getterName -> {
+            final String arraySize = getterName + ARRAY_LENGTH;
             return """
-                    \t\tfor (int i = 0, idx = 0; idx < model.%s; ++idx, i += 2) {
-                    \t\t\tresult[offset + i]     = (byte) (model.%s[idx] >>> 8);
-                    \t\t\tresult[offset + i + 1] = (byte) model.%s[idx];
+                    \t\tfor (int i = 0, idx = 0; idx < %s; ++idx, i += 2) {
+                    \t\t\tresult[offset + i]     = (byte) (%s[idx] >>> 8);
+                    \t\t\tresult[offset + i + 1] = (byte) %s[idx];
                     \t\t}
                     """.formatted(arraySize, getterName, getterName);
         };
     }
 
-    private static BiFunction<Integer, String, String> shortArrayConverter() {
-        return (offset, getterName) -> {
-            final String arraySize = getterName + ".length";
+    private static Function<String, String> shortArrayConverter() {
+        return getterName -> {
+            final String arraySize = getterName + ARRAY_LENGTH;
             return """
-                    \t\tfor (int i = 0, idx = 0; idx < model.%s; ++idx, i += 2) {
-                    \t\t\tresult[offset + i]     = (byte) (model.%s[idx] >>> 8);
-                    \t\t\tresult[offset + i + 1] = (byte) model.%s[idx];
+                    \t\tfor (int i = 0, idx = 0; idx < %s; ++idx, i += 2) {
+                    \t\t\tresult[offset + i]     = (byte) (%s[idx] >>> 8);
+                    \t\t\tresult[offset + i + 1] = (byte) %s[idx];
                     \t\t}
                     """.formatted(arraySize, getterName, getterName);
         };
     }
 
-    private static BiFunction<Integer, String, String> intArrayConverter() {
-        return (offset, getterName) -> {
-            final String arraySize = getterName + ".length";
+    private static Function<String, String> intArrayConverter() {
+        return getterName -> {
+            final String arraySize = getterName + ARRAY_LENGTH;
             return """
-                    \t\tfor (int i = 0, idx = 0; idx < model.%s; ++idx, i += 4) {
-                    \t\t\tresult[offset + i]     = (byte) (model.%s[idx] >>> 24);
-                    \t\t\tresult[offset + i + 1] = (byte) (model.%s[idx] >>> 16);
-                    \t\t\tresult[offset + i + 2] = (byte) (model.%s[idx] >>> 8);
-                    \t\t\tresult[offset + i + 3] = (byte) model.%s[idx];
+                    \t\tfor (int i = 0, idx = 0; idx < %s; ++idx, i += 4) {
+                    \t\t\tresult[offset + i]     = (byte) (%s[idx] >>> 24);
+                    \t\t\tresult[offset + i + 1] = (byte) (%s[idx] >>> 16);
+                    \t\t\tresult[offset + i + 2] = (byte) (%s[idx] >>> 8);
+                    \t\t\tresult[offset + i + 3] = (byte) %s[idx];
                     \t\t}
                     """.formatted(arraySize, getterName, getterName, getterName, getterName);
         };
     }
 
-    private static BiFunction<Integer, String, String> longArrayConverter() {
-        return (offset, getterName) -> {
-            final String arraySize = getterName + ".length";
+    private static Function<String, String> longArrayConverter() {
+        return getterName -> {
+            final String arraySize = getterName + ARRAY_LENGTH;
             return """
-                    \t\tfor (int i = 0, idx = 0; idx < model.%s; ++idx, i += 8) {
-                    \t\t\tresult[offset + i]     = (byte) (model.%s[idx] >>> 56);;
-                    \t\t\tresult[offset + i + 1] = (byte) (model.%s[idx] >>> 48);
-                    \t\t\tresult[offset + i + 2] = (byte) (model.%s[idx] >>> 40);
-                    \t\t\tresult[offset + i + 3] = (byte) (model.%s[idx] >>> 32);
-                    \t\t\tresult[offset + i + 4] = (byte) (model.%s[idx] >>> 24);
-                    \t\t\tresult[offset + i + 5] = (byte) (model.%s[idx] >>> 16);
-                    \t\t\tresult[offset + i + 6] = (byte) (model.%s[idx] >>> 8);
-                    \t\t\tresult[offset + i + 7] = (byte) model.%s[idx];
+                    \t\tfor (int i = 0, idx = 0; idx < %s; ++idx, i += 8) {
+                    \t\t\tresult[offset + i]     = (byte) (%s[idx] >>> 56);;
+                    \t\t\tresult[offset + i + 1] = (byte) (%s[idx] >>> 48);
+                    \t\t\tresult[offset + i + 2] = (byte) (%s[idx] >>> 40);
+                    \t\t\tresult[offset + i + 3] = (byte) (%s[idx] >>> 32);
+                    \t\t\tresult[offset + i + 4] = (byte) (%s[idx] >>> 24);
+                    \t\t\tresult[offset + i + 5] = (byte) (%s[idx] >>> 16);
+                    \t\t\tresult[offset + i + 6] = (byte) (%s[idx] >>> 8);
+                    \t\t\tresult[offset + i + 7] = (byte) %s[idx];
                     \t\t}
                     """.formatted(arraySize, getterName, getterName, getterName, getterName, getterName, getterName,
                     getterName, getterName);
         };
     }
 
-    private static BiFunction<Integer, String, String> floatArrayConverter() {
-        return (offset, getterName) -> {
-            final String arraySize = getterName + ".length";
+    private static Function<String, String> floatArrayConverter() {
+        return getterName -> {
+            final String arraySize = getterName + ARRAY_LENGTH;
             return """
-                    \t\tfor (int i = 0, idx = 0; idx < model.%s; ++idx, i += 4) {
-                    \t\t\tfloatBits = Float.floatToIntBits(model.%s[idx]);
+                    \t\tfor (int i = 0, idx = 0; idx < %s; ++idx, i += 4) {
+                    \t\t\tfloatBits = Float.floatToIntBits(%s[idx]);
                     \t\t\tresult[offset + i]     = (byte) (floatBits >>> 24);
                     \t\t\tresult[offset + i + 1] = (byte) (floatBits >>> 16);
                     \t\t\tresult[offset + i + 2] = (byte) (floatBits >>> 8);
@@ -491,12 +587,12 @@ public class SerializerProcessor extends AbstractProcessor {
         };
     }
 
-    private static BiFunction<Integer, String, String> doubleArrayConverter() {
-        return (offset, getterName) -> {
-            final String arraySize = getterName + ".length";
+    private static Function<String, String> doubleArrayConverter() {
+        return getterName -> {
+            final String arraySize = getterName + ARRAY_LENGTH;
             return """
-                    \t\tfor (int i = 0, idx = 0; idx < model.%s; ++idx, i += 8) {
-                    \t\t\tdoubleBits = Double.doubleToLongBits(model.%s[idx]);
+                    \t\tfor (int i = 0, idx = 0; idx < %s; ++idx, i += 8) {
+                    \t\t\tdoubleBits = Double.doubleToLongBits(%s[idx]);
                     \t\t\tresult[offset + i]     = (byte) (doubleBits >>> 56);
                     \t\t\tresult[offset + i + 1] = (byte) (doubleBits >>> 48);
                     \t\t\tresult[offset + i + 2] = (byte) (doubleBits >>> 40);
