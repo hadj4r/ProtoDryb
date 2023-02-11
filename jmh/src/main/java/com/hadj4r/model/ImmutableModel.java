@@ -21,13 +21,15 @@ public class ImmutableModel {
     private final long[] longArrayVar;
     private final float[] floatArrayVar;
     private final double[] doubleArrayVar;
+    private final Child childVar;
+    private final Child2 child2Var;
 
     @CompiledJson(onUnknown = FAIL, formats = {OBJECT, ARRAY})
-    public ImmutableModel(final boolean booleanVar, final short shortVar,
-                          final int intVar, final long longVar, final float floatVar, final double doubleVar,
-                          final String stringVar, final String stringVar2, final boolean[] booleanArrayVar,
-                          final short[] shortArrayVar, final int[] intArrayVar, final long[] longArrayVar,
-                          final float[] floatArrayVar, final double[] doubleArrayVar) {
+    public ImmutableModel(final boolean booleanVar, final short shortVar, final int intVar, final long longVar,
+                          final float floatVar, final double doubleVar, final String stringVar, final String stringVar2,
+                          final boolean[] booleanArrayVar, final short[] shortArrayVar, final int[] intArrayVar,
+                          final long[] longArrayVar, final float[] floatArrayVar, final double[] doubleArrayVar,
+                          final Child childVar, final Child2 child2Var) {
         this.booleanVar = booleanVar;
         this.shortVar = shortVar;
         this.intVar = intVar;
@@ -42,6 +44,8 @@ public class ImmutableModel {
         this.longArrayVar = longArrayVar;
         this.floatArrayVar = floatArrayVar;
         this.doubleArrayVar = doubleArrayVar;
+        this.childVar = childVar;
+        this.child2Var = child2Var;
     }
 
     public boolean isBooleanVar() {
@@ -100,6 +104,14 @@ public class ImmutableModel {
         return doubleArrayVar;
     }
 
+    public Child getChildVar() {
+        return childVar;
+    }
+
+    public Child2 getChild2Var() {
+        return child2Var;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -119,6 +131,8 @@ public class ImmutableModel {
         private long[] longArrayVar;
         private float[] floatArrayVar;
         private double[] doubleArrayVar;
+        private Child childVar;
+        private Child2 child2Var;
 
         public Builder setBooleanVar(boolean booleanVar) {
             this.booleanVar = booleanVar;
@@ -190,10 +204,19 @@ public class ImmutableModel {
             return this;
         }
 
+        public Builder setChildVar(Child childVar) {
+            this.childVar = childVar;
+            return this;
+        }
+
+        public Builder setChild2Var(Child2 child2Var) {
+            this.child2Var = child2Var;
+            return this;
+        }
+
         public ImmutableModel build() {
-            return new ImmutableModel(booleanVar, shortVar, intVar, longVar, floatVar, doubleVar,
-                    stringVar, stringVar2, booleanArrayVar, shortArrayVar, intArrayVar,
-                    longArrayVar, floatArrayVar, doubleArrayVar);
+            return new ImmutableModel(booleanVar, shortVar, intVar, longVar, floatVar, doubleVar, stringVar, stringVar2,
+                    booleanArrayVar, shortArrayVar, intArrayVar, longArrayVar, floatArrayVar, doubleArrayVar, childVar, child2Var);
         }
     }
 }

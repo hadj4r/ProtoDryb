@@ -1,18 +1,53 @@
 namespace com.hadj4r.model.flatbuffers;
 
-table FlatbuffersModel {
+table FlatbuffersModel{
     boolean_var: bool;
     short_var: short;
-    int_var: int32;
-    long_var: int64;
+    int_var: int;
+    long_var: long;
     float_var: float;
     double_var: double;
     string_var: string;
     string_var2: string;
     boolean_array_var: [bool];
     short_array_var: [short];
-    int_array_var: [int32];
-    long_array_var: [int64];
+    int_array_var: [int];
+    long_array_var: [long];
     float_array_var: [float];
     double_array_var: [double];
+    child_var: FbChild;
+    child2_var: FbChild2;
+}
+
+table FbChild{
+    child_boolean_var1: bool;
+    grandchild: FbGrandchild;
+    child_boolean_var2: bool;
+}
+
+table FbGrandchild{
+    grand_child_int_var: int;
+    shared1: FbShared;
+}
+
+table FbShared{
+    shared_double_var: double;
+}
+
+table FbChild2{
+    duplicate1: FbDuplicate;
+    grandchild2: FbGrandchild2;
+    duplicate2: FbDuplicate;
+    shared2: FbShared;
+}
+
+table FbDuplicate{
+    duplicate_int_var: int;
+    duplicate_int_array_var: [int];
+    duplicate_boolean_var: bool;
+}
+
+table FbGrandchild2{
+    grand_child2_string_var: string;
+    shared1: FbShared;
 }

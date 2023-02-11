@@ -10,3 +10,6 @@
 ```bash
 ./generate_serializers.sh
 ```
+
+### TODOS
+- [ ] add length of serialized data to the benchmark result 

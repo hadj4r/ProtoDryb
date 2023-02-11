@@ -16,4 +16,39 @@ message ProtoModel {
     repeated sint64 longArrayVar = 12;
     repeated float floatArrayVar = 13;
     repeated double doubleArrayVar = 14;
+    PbChild childVar = 15;
+    PbChild2 child2Var = 16;
+}
+
+message PbChild {
+    bool childBooleanVar1 = 1;
+    PbGrandchild grandchild = 2;
+    bool childBooleanVar2 = 3;
+}
+
+message PbGrandchild {
+    sint32 grandChildIntVar = 1;
+    PbShared shared1 = 2;
+}
+
+message PbShared {
+    double sharedDoubleVar = 1;
+}
+
+message PbChild2 {
+    PbDuplicate duplicate1 = 1;
+    PbGrandchild2 grandchild2 = 2;
+    PbDuplicate duplicate2 = 3;
+    PbShared shared2 = 4;
+}
+
+message PbDuplicate {
+    sint32 duplicateIntVar = 1;
+    repeated sint32 duplicateIntArrayVar = 2;
+    bool duplicateBooleanVar = 3;
+}
+
+message PbGrandchild2 {
+    string grandChild2StringVar = 1;
+    PbShared shared1 = 2;
 }
