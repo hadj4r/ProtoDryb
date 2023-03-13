@@ -246,7 +246,6 @@ public class SerializerProcessor extends AbstractProcessor {
 
         final Node root = createTreeOfFieldNodes(rootModel, rootModel, null, roundEnv);
         root.setFieldName("model");
-        final Map<String, Byte> typesToIds = calculateTypeIds(root);
 
         final StringBuilder sb = new StringBuilder();
 
@@ -257,35 +256,13 @@ public class SerializerProcessor extends AbstractProcessor {
 
             calculateFinalByteArraySize(sb, root, stringGetterToSize);
             addFloatAndDoubleFieldsForCachingIfNecessary(sb, root);
-            processFieldsSerialization(sb, root, typesToIds, stringGetterToSize);
+            processFieldsSerialization(sb, root, stringGetterToSize);
             processTail(sb);
 
             writer.write(sb.toString());
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    private Map<String, Byte> calculateTypeIds(final Node root) {
-        final Map<Node, Byte> typesToIds = new TreeMap<>(Comparator.comparing(Node::getType));
-        byte id = 0;
-
-        final Queue<Node> queue = new LinkedList<>();
-        queue.add(root);
-
-        while (!queue.isEmpty()) {
-            final Node node = queue.poll();
-            if (!typesToIds.containsKey(node)) {
-                typesToIds.put(node, ++id);
-            }
-
-            node.getChildren().stream()
-                    .filter(ch -> isCustomType(ch.getType()))
-                    .forEach(queue::add);
-        }
-
-        return typesToIds.entrySet().stream()
-                .collect(Collectors.toMap(e -> e.getKey().getType(), Map.Entry::getValue));
     }
 
     private Node createTreeOfFieldNodes(final Element classElement, final Element fieldElement, final Node parent,
@@ -328,9 +305,8 @@ public class SerializerProcessor extends AbstractProcessor {
     }
 
     private static void processFieldsSerialization(final StringBuilder sb, final Node root,
-                                                   final Map<String, Byte> typesToIds, final Map<String, String> stringFieldGetterToSize) {
+                                                   final Map<String, String> stringFieldGetterToSize) {
         sb.append("\t\tint offset = 0;\n\n");
-        int offset = 0;
         final Stack<Node> stack = new Stack<>();
         stack.add(root);
 
@@ -340,15 +316,7 @@ public class SerializerProcessor extends AbstractProcessor {
             final String getterName = node.getFieldNameAsGetter();
 
             if (isCustomType(fieldType)) {
-                final Byte id = typesToIds.get(fieldType);
-                sb
-                        .append("\t\t// adding type for type")
-                        .append(fieldType)
-                        .append('\n')
-                        .append(TYPE_ID.apply(offset, id))
-                        .append('\n');
                 stack.addAll(node.getChildren());
-                offset += 1;
             } else if (isPrimitive(fieldType)) {
                 final Function<String, String> primitiveToFunction = PRIMITIVE_TYPE_TO_CONVERTER.get(fieldType);
                 final String primitiveVariableConversation = primitiveToFunction.apply(getterName);
@@ -356,7 +324,6 @@ public class SerializerProcessor extends AbstractProcessor {
                         .append(primitiveVariableConversation)
                         .append('\n');
 
-                offset += PRIMITIVE_TYPE_TO_SIZE.get(fieldType);// doesn't recheck the type because it is already checked above
             } else if (isString(fieldType)) {
                 sb
                         .append(STRING_CONVERTER.apply(getterName).formatted(getterName))
@@ -435,7 +402,6 @@ public class SerializerProcessor extends AbstractProcessor {
             final String fieldGetter = node.getFieldNameAsGetter();
 
             if (isCustomType(type)) {
-                modelSize += 1; // 1 byte to identify the type
                 node.getChildren().forEach(stack::push);
             } else if (isPrimitive(type)) {
                 modelSize += PRIMITIVE_TYPE_TO_SIZE.get(type);

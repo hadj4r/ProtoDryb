@@ -16,51 +16,51 @@ class SerializerServiceTest {
     @Test
     void shouldReturnValidSerializedObject() {
         final ImmutableTestClass immutableTestClass = ImmutableTestClass.builder()
-                .setBooleanVar(true)//2
-                .setCharVar('a')//4
-                .setByteVar((byte) 1)//5
-                .setShortVar((short) 2)//7
-                .setIntVar(3)//11
-                .setLongVar(4L)//19
-                .setFloatVar(5.0f)//23
-                .setDoubleVar(6.0)//31
-                .setStringVar("test")//36
-                .setStringVar2("another test")//49
-                .setBooleanArrayVar(new boolean[]{false, true, false})//53
-                .setCharArrayVar(new char[]{'a', 'b', 'c'})//60
-                .setByteArrayVar(new byte[]{1, 2, 3})//64
-                .setShortArrayVar(new short[]{4, 5, 6})//71
-                .setIntArrayVar(new int[]{7, 8, 9})//84
-                .setLongArrayVar(new long[]{10L, 11L, 12L})//109
-                .setFloatArrayVar(new float[]{13.f, 14.f, 15.f})//122
-                .setDoubleArrayVar(new double[]{16., 17., 18.})//147
+                .setBooleanVar(true)                                            // 1
+                .setCharVar('a')                                                // 3
+                .setByteVar((byte) 1)                                           // 4
+                .setShortVar((short) 2)                                         // 6
+                .setIntVar(3)                                                   // 10
+                .setLongVar(4L)                                                 // 18
+                .setFloatVar(5.0f)                                              // 22
+                .setDoubleVar(6.0)                                              // 30
+                .setStringVar("test")                                           // 36 (1 for optional + 1 for size)
+                .setStringVar2("another test")                                  // 50
+                .setBooleanArrayVar(new boolean[]{false, true, false})          // 55
+                .setCharArrayVar(new char[]{'a', 'b', 'c'})                     // 63
+                .setByteArrayVar(new byte[]{1, 2, 3})                           // 68
+                .setShortArrayVar(new short[]{4, 5, 6})                         // 76
+                .setIntArrayVar(new int[]{7, 8, 9})                             // 90
+                .setLongArrayVar(new long[]{10L, 11L, 12L})                     // 118
+                .setFloatArrayVar(new float[]{13.f, 14.f, 15.f})                // 132
+                .setDoubleArrayVar(new double[]{16., 17., 18.})                 // 158
                 .setChildVar(
-                        new Child(//148
-                                false,//149
-                                new Grandchild(//150
-                                        (byte) 19,//151
-                                        new Shared(20.)//160
+                        new Child(                                              // 159
+                                false,                                          // 160
+                                new Grandchild(                                 // 161
+                                        (byte) 19,                              // 162
+                                        new Shared(20.)           // 172
                                 ),
-                                true//161
+                                true                                            // 173
                         )
                 )
                 .setChild2Var(
-                        new Child2(//162
-                                new Duplicate(//163
-                                        21,//167
-                                        new int[]{22, 23, 24},//180
-                                        false//181
+                        new Child2(                                             // 174
+                                new Duplicate(                                  // 175
+                                        21,                                     // 179
+                                        new int[]{22, 23, 24},                  // 193
+                                        false                                   // 194
                                 ),
-                                new Grandchild2(//182
-                                        "grandchild2",//194
-                                        new Shared(25.)//203
+                                new Grandchild2(                                // 195
+                                        "grandchild2",                          // 208
+                                        new Shared(25.)           // 218
                                 ),
-                                new Duplicate(//204
-                                        26,//208
-                                        new int[]{27, 28, 29},//221
-                                        true//222
+                                new Duplicate(                                  // 219
+                                        26,                                     // 223
+                                        new int[]{27, 28, 29},                  // 237
+                                        true                                    // 238
                                 ),
-                                new Shared(30.)//230
+                                new Shared(30.)                   // 248
                         )
                 )
                 .build();
@@ -69,28 +69,7 @@ class SerializerServiceTest {
 
         assertThat(serialized)
                 .isNotNull()
-                // .hasSize(
-                //         1 +
-                //         2 +
-                //         1 +
-                //         2 +
-                //         4 +
-                //         8 +
-                //         4 +
-                //         8 +
-                //
-                //         1 + 4 +
-                //         1 + 12 +
-                //
-                //         1 + 3 +
-                //         1 + 2 * 3 +
-                //         1 + 3 +
-                //         1 + 2 * 3 +
-                //         1 + 4 * 3 +
-                //         1 + 8 * 3 +
-                //         1 + 4 * 3 +
-                //         1 + 8 * 3
-                // )
+                .hasSize(248)
                 // .isEqualTo(new byte[]{
                 //         1, // boolean
                 //         0, 97, // char
